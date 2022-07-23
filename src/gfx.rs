@@ -71,7 +71,6 @@ pub fn print_device_info(device: &DeviceRef) {
     );
     println!();
 
-    println!("    supported families");
     #[rustfmt::skip]
     const FAMILIES: &[MTLGPUFamily] = &[
         MTLGPUFamily::Apple1,
@@ -86,15 +85,13 @@ pub fn print_device_info(device: &DeviceRef) {
         MTLGPUFamily::Apple9,
     ];
 
-    for family in FAMILIES {
-        let s = format!("{:?}?", family);
-        println!(
-            "      {:<10} {}",
-            s,
-            check_or_x(device.supports_family(*family))
-        );
-    }
-    println!();
+    let family = FAMILIES
+        .iter()
+        .copied()
+        .rev()
+        .find(|family| device.supports_family(*family))
+        .unwrap();
+    println!("    supported family: {family:?}");
 
     println!("    supported  texture sample count:");
     for count in 1.. {

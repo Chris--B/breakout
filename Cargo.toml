@@ -17,3 +17,6 @@ fermium = "20022" # Bundles SDL 2.0.16
 
 # ECS
 legion = { version ="0.4", default-features = false }
+
+# Math
+ultraviolet = { version = "0.9", features = [ "bytemuck", "f64", "int"] }

@@ -1,0 +1,19 @@
+[package]
+name = "breakout"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# Metal Rendering
+metal = "0.24"
+objc = "0.2"
+foreign-types-shared = "*" # Use same version as `objc` & `metal`
+cstr = "0.2"
+
+# Window Management
+fermium = "20022" # Bundles SDL 2.0.16
+
+# ECS
+legion = { version ="0.4.0", default-features = false }

@@ -7,7 +7,11 @@ use std::ptr;
 
 mod gfx;
 
-fn check_sdl_error(func: &str) {
+/// Returns true when there is not error. Think:
+/// ```rust
+/// let ok = check_sdl_error("SDL_Foo");
+/// ```
+fn check_sdl_error(func: &str) -> bool {
     // We can't use `c_char` in literals, we HAVE to cast
     #![allow(clippy::unnecessary_cast)]
 
@@ -15,12 +19,12 @@ fn check_sdl_error(func: &str) {
     use std::ffi::CStr;
 
     unsafe {
-        let mut msg_buf = [0 as c_char; 64];
+        let mut msg_buf = [0 as c_char; 512];
         SDL_GetErrorMsg(&mut msg_buf as *mut c_char, msg_buf.len() as i32);
 
         // If the buffer stays empty, there's nothing to display
         if msg_buf[0] == b'\0' as c_char {
-            return;
+            return true;
         }
 
         // Otherwise, print the error message as a c string
@@ -34,6 +38,8 @@ fn check_sdl_error(func: &str) {
 
         // And clear the error since we're done with it
         SDL_ClearError();
+
+        false
     }
 }
 

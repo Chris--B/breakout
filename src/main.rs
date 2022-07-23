@@ -2,6 +2,8 @@ use metal::*;
 
 use fermium::prelude::*;
 
+use ultraviolet::{Vec2, Vec3};
+
 use std::os::raw::c_void;
 
 mod gfx;
@@ -148,30 +150,17 @@ fn main() {
     metal_layer.set_pixel_format(MTLPixelFormat::BGRA8Unorm);
     metal_layer.set_framebuffer_only(true);
 
-    #[rustfmt::skip]
-    let vertex_data = [
-         0.,  1.,  0.,
-        -1., -1.,  0.,
-         1., -1.,  0.
-    ];
-
-    let vertex_buffer_size_in_bytes = std::mem::size_of_val(&vertex_data[0]) * vertex_data.len();
-    let vertex_buffer = device.new_buffer_with_data(
-        vertex_data.as_ptr() as *const c_void,
-        vertex_buffer_size_in_bytes as u64,
-        MTLResourceOptions::empty(),
-    );
-
-    let default_lib = device.new_library_with_file("Shaders.metallib").unwrap();
-    let vertex_function = default_lib.get_function("basic_vertex", None).unwrap();
-    let fragment_function = default_lib.get_function("basic_fragment", None).unwrap();
-
     // Create Pipeline State
     let pipeline_state: RenderPipelineState;
     {
         let render_pipeline_state_desc = RenderPipelineDescriptor::new();
-        render_pipeline_state_desc.set_vertex_function(Some(&vertex_function));
-        render_pipeline_state_desc.set_fragment_function(Some(&fragment_function));
+
+        let default_lib = device.new_library_with_file("Shaders.metallib").unwrap();
+        let func_vs = default_lib.get_function("vs_instanced_quad", None).unwrap();
+        render_pipeline_state_desc.set_vertex_function(Some(&func_vs));
+
+        let func_fs = default_lib.get_function("fs_instanced_quad", None).unwrap();
+        render_pipeline_state_desc.set_fragment_function(Some(&func_fs));
 
         let color_attachment = render_pipeline_state_desc
             .color_attachments()
@@ -200,8 +189,8 @@ fn main() {
         color_attachment.set_load_action(MTLLoadAction::Clear);
         color_attachment.set_clear_color(MTLClearColor {
             red: 0.,
-            green: 104. / 255.,
-            blue: 55. / 255.,
+            green: 0.,
+            blue: 0.,
             alpha: 1.,
         });
 
@@ -209,10 +198,45 @@ fn main() {
     }
 
     // Record Encoder
-    encoder.set_render_pipeline_state(&pipeline_state);
-    encoder.set_vertex_buffer(0, Some(&vertex_buffer), 0);
-    encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, 3);
-    encoder.end_encoding();
+    {
+        encoder.set_render_pipeline_state(&pipeline_state);
+
+        let per_quad_data = vec![
+            gfx::PerQuad {
+                pos: Vec2::new(-0.8, 0.8),
+                color: Vec3::new(1., 0., 0.),
+                ..Default::default()
+            },
+            gfx::PerQuad {
+                pos: Vec2::new(0.8, -0.8),
+                color: Vec3::new(0., 1., 0.),
+                ..Default::default()
+            },
+            gfx::PerQuad {
+                pos: Vec2::new(-0.8, -0.8),
+                color: Vec3::new(0., 0., 1.),
+                ..Default::default()
+            },
+            gfx::PerQuad {
+                pos: Vec2::new(0.8, 0.8),
+                color: Vec3::new(0.65, 0., 1.00),
+                ..Default::default()
+            },
+        ];
+        let per_quad_buffer = device.new_buffer_with_data(
+            per_quad_data.as_ptr() as *const c_void,
+            (std::mem::size_of_val(&per_quad_data[0]) * per_quad_data.len()) as u64,
+            MTLResourceOptions::empty(),
+        );
+        // 6 vertices per quad
+        let tri_count = 6 * per_quad_data.len() as u64;
+
+        const PER_QUAD_BUFFER_IDX: u64 = 2;
+        encoder.set_vertex_buffer(PER_QUAD_BUFFER_IDX, Some(&per_quad_buffer), 0);
+        encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, tri_count);
+
+        encoder.end_encoding();
+    }
 
     cmd_buffer.present_drawable(drawable);
     cmd_buffer.commit();
@@ -252,11 +276,8 @@ fn main() {
 
         // Render
         unsafe {
-            SDL_RenderClear(p_renderer);
-
             // TODO: Draw things
 
-            SDL_RenderPresent(p_renderer);
             SDL_Delay(100); // TODO: Delay better
         }
     }

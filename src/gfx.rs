@@ -1,6 +1,8 @@
 use metal::*;
 use objc::*;
 
+use ultraviolet::{Vec2, Vec3};
+
 fn check_or_x(p: bool) -> &'static str {
     if p {
         "✅"
@@ -120,4 +122,39 @@ pub fn print_device_info(device: &DeviceRef) {
     println!("    raytracing?                     {}", b);
 
     println!();
+}
+
+#[repr(C, align(16))]
+#[derive(Copy, Clone, Debug)]
+pub struct PerQuad {
+    pub pos: Vec2,
+    pub scale: Vec2,
+    pub color: Vec3,
+}
+
+impl PerQuad {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Default for PerQuad {
+    fn default() -> Self {
+        Self {
+            pos: Vec2::new(0., 0.),
+            scale: Vec2::new(1., 1.),
+            color: Vec3::new(1., 0., 1.),
+        }
+    }
+}
+
+#[cfg(test)]
+mod t {
+    use super::*;
+
+    #[test]
+    fn check_per_prim_size() {
+        // Two float2s can be packed into a single 16-byte slot, but Vec3 takes up a whole slot.
+        assert_eq!(std::mem::size_of::<PerQuad>(), 4 /*fields*/ * (2 + 2 + 4));
+    }
 }

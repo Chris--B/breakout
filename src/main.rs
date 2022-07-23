@@ -78,7 +78,7 @@ fn main() {
         check_sdl_error("SDL_Init");
 
         p_window = SDL_CreateWindow(
-            cstr!("Metal Sandbox").as_ptr(),
+            cstr!("Breakout!").as_ptr(),
             SDL_WINDOWPOS_CENTERED,
             SDL_WINDOWPOS_CENTERED,
             window_width,

@@ -1,6 +1,9 @@
 use metal::*;
 
+use fermium::prelude::*;
+
 use std::os::raw::c_void;
+use std::ptr;
 
 mod gfx;
 
@@ -22,7 +25,12 @@ fn check_sdl_error(func: &str) {
 
         // Otherwise, print the error message as a c string
         let msg = CStr::from_ptr(msg_buf.as_ptr());
-        println!("*** {}: {} ***", func, msg.to_str().unwrap());
+        let msg = msg.to_str().unwrap();
+        println!();
+        println!("**********************************************************************");
+        println!("*** {func}: {msg}");
+        println!("**********************************************************************");
+        println!();
 
         // And clear the error since we're done with it
         SDL_ClearError();
@@ -38,9 +46,9 @@ fn main() {
     gfx::print_device_info(&device);
 
     let metal_layer: MetalLayer;
+    let p_window: *mut SDL_Window;
     unsafe {
         use cstr::cstr;
-        use fermium::prelude::*;
         use foreign_types_shared::ForeignType;
         use std::ffi::CStr;
 
@@ -52,7 +60,7 @@ fn main() {
         SDL_InitSubSystem(SDL_INIT_VIDEO);
         check_sdl_error("SDL_InitSubSystem");
 
-        let p_window = SDL_CreateWindow(
+        p_window = SDL_CreateWindow(
             cstr!("Metal Sandbox").as_ptr(),
             SDL_WINDOWPOS_CENTERED,
             SDL_WINDOWPOS_CENTERED,
@@ -63,16 +71,51 @@ fn main() {
         check_sdl_error("SDL_CreateWindow");
         assert_ne!(p_window, std::ptr::null_mut());
 
-        let num_video_drivers = SDL_GetNumVideoDrivers();
         println!("SDL Video Drivers:");
-        for i in 0..num_video_drivers {
-            let p_name: *const c_char = SDL_GetVideoDriver(i);
+        for idx in 0..SDL_GetNumVideoDrivers() {
+            let p_name: *const c_char = SDL_GetVideoDriver(idx);
             let name = CStr::from_ptr(std::mem::transmute(p_name));
-            println!("  {}", name.to_str().unwrap());
+            let name = name.to_str().unwrap();
+            println!("  + {name}",);
         }
         println!();
 
-        let p_renderer = SDL_CreateRenderer(p_window, -1, SDL_RENDERER_PRESENTVSYNC.0);
+        println!("SDL Render Drivers:");
+        for idx in 0..SDL_GetNumRenderDrivers() {
+            let mut info = SDL_RendererInfo::default();
+            SDL_GetRenderDriverInfo(idx, &mut info);
+
+            let name = CStr::from_ptr(info.name);
+            let name = name.to_str().unwrap();
+
+            print!("  + {name:<15} ");
+
+            let flags: SDL_RendererFlags = std::mem::transmute(info.flags);
+            if SDL_RendererFlags(0) != flags & SDL_RENDERER_ACCELERATED {
+                print!("ACCELERATED   ");
+            } else {
+                print!("              ");
+            }
+            if SDL_RendererFlags(0) != flags & SDL_RENDERER_PRESENTVSYNC {
+                print!("PRESENTVSYNC  ");
+            } else {
+                print!("              ");
+            }
+            if SDL_RendererFlags(0) != flags & SDL_RENDERER_SOFTWARE {
+                print!("SOFTWARE      ");
+            } else {
+                print!("              ");
+            }
+            if SDL_RendererFlags(0) != flags & SDL_RENDERER_TARGETTEXTURE {
+                print!("TARGETTEXTURE ");
+            } else {
+                print!("              ");
+            }
+            println!();
+        }
+        println!();
+
+        let p_renderer = SDL_CreateRenderer(p_window, -1, 0);
         check_sdl_error("SDL_CreateRenderer");
         assert_ne!(p_renderer, std::ptr::null_mut());
 

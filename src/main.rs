@@ -3,7 +3,6 @@ use metal::*;
 use fermium::prelude::*;
 
 use std::os::raw::c_void;
-use std::ptr;
 
 mod gfx;
 
@@ -40,6 +39,15 @@ fn check_sdl_error(func: &str) -> bool {
         SDL_ClearError();
 
         false
+    }
+}
+
+fn poll_event() -> Option<SDL_Event> {
+    let mut e = SDL_Event::default();
+    if unsafe { SDL_PollEvent(&mut e) == 1 } {
+        Some(e)
+    } else {
+        None
     }
 }
 
@@ -127,6 +135,7 @@ fn main() {
         p_renderer = SDL_CreateRenderer(p_window, -1, 0);
         check_sdl_error("SDL_CreateRenderer");
         assert_ne!(p_renderer, std::ptr::null_mut());
+        SDL_SetRenderDrawColor(p_renderer, 0, 0, 0, 255);
 
         p_swapchain = SDL_RenderGetMetalLayer(p_renderer) as *mut _;
         check_sdl_error("SDL_RenderGetMetalLayer");
@@ -213,19 +222,45 @@ fn main() {
         device.current_allocated_size()
     );
 
+    // Everything is initialized, let's kick off our main loop
     unsafe {
         SDL_ShowWindow(p_window);
         check_sdl_error("SDL_ShowWindow");
+    }
 
-        SDL_SetRenderDrawColor(p_renderer, 0, 0, 0, 255);
+    'main_loop: loop {
+        // Handle events
+        while let Some(e) = poll_event() {
+            // Access to unions is unsafe, so this match block is going to get spicy
+            match unsafe { e.type_ } {
+                // Immediately quit everything - unhandled events are forever ignored
+                SDL_QUIT => {
+                    break 'main_loop;
+                }
 
-        for _ in 0..10 {
-            SDL_RenderClear(p_renderer);
-            SDL_RenderPresent(p_renderer);
+                SDL_KEYDOWN | SDL_KEYUP => {
+                    // TODO: Do something interesting I guess
+                    // unsafe { dbg!(e.key) }
+                }
 
-            SDL_Delay(100);
+                // Ignore unhandled events
+                _ => {}
+            }
         }
 
+        // Render
+        unsafe {
+            SDL_RenderClear(p_renderer);
+
+            // TODO: Draw things
+
+            SDL_RenderPresent(p_renderer);
+            SDL_Delay(100); // TODO: Delay better
+        }
+    }
+
+    // Cleanup
+    unsafe {
         SDL_DestroyWindow(p_window);
         SDL_Quit();
     }

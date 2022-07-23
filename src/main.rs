@@ -51,8 +51,11 @@ fn main() {
     let device = Device::system_default().unwrap();
     gfx::print_device_info(&device);
 
+    // SDL init
     let metal_layer: MetalLayer;
     let p_window: *mut SDL_Window;
+    let p_renderer: *mut SDL_Renderer;
+    let p_swapchain: *mut metal::CAMetalLayer;
     unsafe {
         use cstr::cstr;
         use foreign_types_shared::ForeignType;
@@ -63,8 +66,8 @@ fn main() {
         SDL_SetHint(hint_render_driver.as_ptr(), cstr!("metal").as_ptr());
         check_sdl_error("SDL_SetHint");
 
-        SDL_InitSubSystem(SDL_INIT_VIDEO);
-        check_sdl_error("SDL_InitSubSystem");
+        SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
+        check_sdl_error("SDL_Init");
 
         p_window = SDL_CreateWindow(
             cstr!("Metal Sandbox").as_ptr(),
@@ -121,20 +124,15 @@ fn main() {
         }
         println!();
 
-        let p_renderer = SDL_CreateRenderer(p_window, -1, 0);
+        p_renderer = SDL_CreateRenderer(p_window, -1, 0);
         check_sdl_error("SDL_CreateRenderer");
         assert_ne!(p_renderer, std::ptr::null_mut());
 
-        let p_swapchain: *mut metal::CAMetalLayer = SDL_RenderGetMetalLayer(p_renderer) as *mut _;
+        p_swapchain = SDL_RenderGetMetalLayer(p_renderer) as *mut _;
         check_sdl_error("SDL_RenderGetMetalLayer");
         assert_ne!(p_swapchain, std::ptr::null_mut());
 
         metal_layer = MetalLayer::from_ptr(p_swapchain);
-
-        SDL_ShowWindow(p_window);
-        check_sdl_error("SDL_ShowWindow");
-
-        // TODO: We're leaking some pointers, we should fix that.
     }
 
     metal_layer.set_device(&device);
@@ -214,4 +212,21 @@ fn main() {
         "current_allocated_size = {}",
         device.current_allocated_size()
     );
+
+    unsafe {
+        SDL_ShowWindow(p_window);
+        check_sdl_error("SDL_ShowWindow");
+
+        SDL_SetRenderDrawColor(p_renderer, 0, 0, 0, 255);
+
+        for _ in 0..10 {
+            SDL_RenderClear(p_renderer);
+            SDL_RenderPresent(p_renderer);
+
+            SDL_Delay(100);
+        }
+
+        SDL_DestroyWindow(p_window);
+        SDL_Quit();
+    }
 }

@@ -239,8 +239,10 @@ fn main() {
                 }
 
                 SDL_KEYDOWN | SDL_KEYUP => {
-                    // TODO: Do something interesting I guess
-                    // unsafe { dbg!(e.key) }
+                    let key = unsafe { e.key };
+                    if key.keysym.sym == SDLK_q {
+                        break 'main_loop;
+                    }
                 }
 
                 // Ignore unhandled events

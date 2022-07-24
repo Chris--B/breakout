@@ -155,7 +155,9 @@ fn main() {
     {
         let render_pipeline_state_desc = RenderPipelineDescriptor::new();
 
-        let default_lib = device.new_library_with_file("Shaders.metallib").unwrap();
+        let default_lib = device
+            .new_library_with_data(gfx::shaders::SHADERS_BIN)
+            .unwrap();
         let func_vs = default_lib.get_function("vs_instanced_quad", None).unwrap();
         render_pipeline_state_desc.set_vertex_function(Some(&func_vs));
 

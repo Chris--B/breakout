@@ -124,18 +124,21 @@ pub fn print_device_info(device: &DeviceRef) {
     println!();
 }
 
+pub mod shaders {
+    pub const SHADERS_BIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/Shaders.metallib"));
+
+    #[allow(dead_code)]
+    pub fn write_shaderlib_to(path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
+        std::fs::write(path, SHADERS_BIN)
+    }
+}
+
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Debug)]
 pub struct PerQuad {
     pub pos: Vec2,
     pub scale: Vec2,
     pub color: Vec3,
-}
-
-impl PerQuad {
-    pub fn new() -> Self {
-        Self::default()
-    }
 }
 
 impl Default for PerQuad {

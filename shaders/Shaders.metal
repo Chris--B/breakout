@@ -1,9 +1,8 @@
+#include "Public.h"
 
-constant int BUFFER_IDX_VIEW = 1;
-constant int BUFFER_IDX_PER_QUAD = 2;
-
+// Helper to get a compile-time array's length
 template <typename T, size_t N>
-size_t array_len(constant T const (&arr)[N]) {
+constexpr size_t array_len(constant T const (&arr)[N]) {
     return N;
 }
 
@@ -16,17 +15,6 @@ constant constexpr float2 quad_verts[] = {
     float2( 0.5f, -0.5f),
     float2( 0.5f,  0.5f),
 };
-
-struct View {
-    float todo;
-};
-
-struct PerQuad {
-    float2 pos;
-    float2 scale;
-    float3 color;
-};
-static_assert(sizeof(PerQuad) == 4 * (2 + 2 + 4), "Unexpected size of PerQuad");
 
 struct VsOut {
     float4 pos [[position]];

@@ -57,9 +57,9 @@ dependencies = [
 
 [[package]]
 name = "bytemuck"
-version = "1.10.0"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c53dfa917ec274df8ed3c572698f381a24eef2efba9492d797301b72b6db408a"
+checksum = "a5377c8865e74a160d21f29c2d40669f53286db6eab59b88540cbb12ffc8b835"
 
 [[package]]
 name = "cc"
@@ -227,9 +227,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.14"
+version = "0.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51b9bbe6c47d51fc3e1a9b945965946b4c44142ab8792c50835a980d362c2710"
+checksum = "abb12e687cfb44aa40f41fc3978ef76448f9b6038cad6aef4259d3c095a2382e"
 dependencies = [
  "cfg-if",
 ]
@@ -309,18 +309,18 @@ checksum = "0c520e05135d6e763148b6426a837e239041653ba7becd2e538c076c738025fc"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.37"
+version = "1.0.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec757218438d5fda206afc041538b2f6d889286160d649a86a24d37e1235afd1"
+checksum = "dd96a1e8ed2596c337f8eae5f24924ec83f5ad5ab21ea8e455d3566c69fbcaf7"
 dependencies = [
- "unicode-xid",
+ "unicode-ident",
 ]
 
 [[package]]
 name = "quote"
-version = "1.0.18"
+version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1feb54ed693b93a84e14094943b84b7c4eae204c512b7ccb95ab0c66d278ad1"
+checksum = "3bcdf212e9776fbcb2d23ab029360416bb1706b1aea2d1a5ba002727cbcab804"
 dependencies = [
  "proc-macro2",
 ]
@@ -363,13 +363,13 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "syn"
-version = "1.0.94"
+version = "1.0.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a07e33e919ebcd69113d5be0e4d70c5707004ff45188910106854f38b960df4a"
+checksum = "c50aef8a904de4c23c788f104b7dddc7d6f79c647c7c8ce4cc8f73eb0ca773dd"
 dependencies = [
  "proc-macro2",
  "quote",
- "unicode-xid",
+ "unicode-ident",
 ]
 
 [[package]]
@@ -403,10 +403,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "unicode-xid"
-version = "0.2.2"
+name = "unicode-ident"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ccb82d61f80a663efe1f787a51b16b5a51e3314d6ac365b08639f52387b33f3"
+checksum = "15c61ba63f9235225a22310255a29b806b907c9b8c964bcbd0a2c70f3f2deea7"
 
 [[package]]
 name = "uuid"

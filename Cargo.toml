@@ -9,7 +9,7 @@ edition = "2021"
 # Metal Rendering
 metal = "0.24"
 objc = "0.2"
-foreign-types-shared = "*" # Use same version as `objc` & `metal`
+foreign-types-shared = "0.1" # Use same version as `objc` & `metal`
 cstr = "0.2"
 
 # Window Management

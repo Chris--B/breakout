@@ -1,12 +1,39 @@
 use metal::*;
 use objc::*;
 
-use ultraviolet::{Vec2, Vec3};
-
-use static_assertions::{assert_eq_align, assert_eq_size};
-
 pub mod shaders {
+    use static_assertions::{assert_eq_align, assert_eq_size};
+    use ultraviolet::{Vec2, Vec3};
+
     pub const SHADERS_BIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/Shaders.metallib"));
+
+    #[repr(C)]
+    #[derive(Copy, Clone, Debug)]
+    pub struct View {
+        pub todo: f32,
+    }
+    assert_eq_size!(View, [f32; 1]);
+    assert_eq_align!(View, f32);
+
+    #[repr(C)]
+    #[derive(Copy, Clone, Debug)]
+    pub struct PerQuad {
+        pub pos: Vec2,
+        pub scale: Vec2,
+        pub color: Vec3,
+    }
+    assert_eq_size!(PerQuad, [f32; 2 + 2 + 3]);
+    assert_eq_align!(PerQuad, f32);
+
+    impl Default for PerQuad {
+        fn default() -> Self {
+            Self {
+                pos: Vec2::new(0., 0.),
+                scale: Vec2::new(1., 1.),
+                color: Vec3::new(1., 0., 1.),
+            }
+        }
+    }
 }
 
 fn check_or_x(p: bool) -> &'static str {
@@ -128,32 +155,4 @@ pub fn print_device_info(device: &DeviceRef) {
     println!("    raytracing?                     {}", b);
 
     println!();
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-pub struct View {
-    pub todo: f32,
-}
-assert_eq_size!(View, [f32; 1]);
-assert_eq_align!(View, f32);
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-pub struct PerQuad {
-    pub pos: Vec2,
-    pub scale: Vec2,
-    pub color: Vec3,
-}
-assert_eq_size!(PerQuad, [f32; 2 + 2 + 3]);
-assert_eq_align!(PerQuad, f32);
-
-impl Default for PerQuad {
-    fn default() -> Self {
-        Self {
-            pos: Vec2::new(0., 0.),
-            scale: Vec2::new(1., 1.),
-            color: Vec3::new(1., 0., 1.),
-        }
-    }
 }

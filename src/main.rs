@@ -201,25 +201,27 @@ fn main() {
 
     // Record Encoder
     {
+        use gfx::shaders::PerQuad;
+
         encoder.set_render_pipeline_state(&pipeline_state);
 
         let per_quad_data = vec![
-            gfx::PerQuad {
+            PerQuad {
                 pos: Vec2::new(-0.8, 0.8),
                 color: Vec3::new(1., 0., 0.),
                 ..Default::default()
             },
-            gfx::PerQuad {
+            PerQuad {
                 pos: Vec2::new(0.8, -0.8),
                 color: Vec3::new(0., 1., 0.),
                 ..Default::default()
             },
-            gfx::PerQuad {
+            PerQuad {
                 pos: Vec2::new(-0.8, -0.8),
                 color: Vec3::new(0., 0., 1.),
                 ..Default::default()
             },
-            gfx::PerQuad {
+            PerQuad {
                 pos: Vec2::new(0.8, 0.8),
                 color: Vec3::new(0.65, 0., 1.00),
                 ..Default::default()

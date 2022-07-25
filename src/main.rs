@@ -1,6 +1,8 @@
 use fermium::prelude::*;
+use ultraviolet::{Vec2, Vec3};
 
 mod gfx;
+use gfx::shaders::PerQuad;
 
 fn poll_event() -> Option<SDL_Event> {
     let mut e = SDL_Event::default();
@@ -12,8 +14,36 @@ fn poll_event() -> Option<SDL_Event> {
 }
 
 fn main() {
-    let gpu = gfx::GpuDevice::new();
+    let window_width: i32 = 1_000;
+    let window_height: i32 = 1_000;
+    let window = gfx::Window::new(window_width, window_height);
 
+    let gpu = gfx::GpuDevice::new(&window);
+
+    let quads = vec![
+        PerQuad {
+            pos: Vec2::new(-0.8, 0.8),
+            color: Vec3::new(1., 0., 0.),
+            ..Default::default()
+        },
+        PerQuad {
+            pos: Vec2::new(0.8, -0.8),
+            color: Vec3::new(0., 1., 0.),
+            ..Default::default()
+        },
+        PerQuad {
+            pos: Vec2::new(-0.8, -0.8),
+            color: Vec3::new(0., 0., 1.),
+            ..Default::default()
+        },
+        PerQuad {
+            pos: Vec2::new(0.8, 0.8),
+            color: Vec3::new(0.65, 0., 1.00),
+            ..Default::default()
+        },
+    ];
+
+    window.show();
     'main_loop: loop {
         // Handle events
         while let Some(e) = poll_event() {
@@ -38,6 +68,8 @@ fn main() {
 
         // Render
         unsafe {
+            gpu.render_and_present(&quads);
+
             SDL_Delay(100); // TODO: Delay better
         }
     }

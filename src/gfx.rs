@@ -5,12 +5,15 @@ use objc::*;
 use ultraviolet::{Vec2, Vec3};
 
 use std::os::raw::c_void;
+use std::sync::Arc;
 
 pub mod shaders {
     use super::*;
     use static_assertions::{assert_eq_align, assert_eq_size};
 
     pub const SHADERS_BIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/Shaders.metallib"));
+
+    pub const BUFFER_IDX_PER_QUAD: u64 = 2;
 
     #[repr(C)]
     #[derive(Copy, Clone, Debug)]
@@ -198,34 +201,20 @@ fn check_sdl_error(func: &str) -> bool {
     }
 }
 
-pub struct GpuDevice {
-    device: Device,
-    cmd_queue: CommandQueue,
-    pipeline_state: RenderPipelineState,
+#[derive(Clone)]
+pub struct Window(Arc<WindowImpl>);
 
-    metal_layer: MetalLayer,
+pub struct WindowImpl {
     p_window: *mut SDL_Window,
     p_renderer: *mut SDL_Renderer,
 }
 
-impl GpuDevice {
-    pub fn new() -> Self {
-        let window_width: i32 = 1_000;
-        let window_height: i32 = 1_000;
+impl Window {
+    pub fn new(width: i32, height: i32) -> Self {
+        use cstr::cstr;
+        use std::ffi::CStr;
 
-        // gfx init
-        let device = Device::system_default().unwrap();
-        print_device_info(&device);
-
-        // SDL init
-        let metal_layer: MetalLayer;
-        let p_window: *mut SDL_Window;
-        let p_renderer: *mut SDL_Renderer;
         unsafe {
-            use cstr::cstr;
-            use foreign_types_shared::ForeignType;
-            use std::ffi::CStr;
-
             let hint_render_driver: &CStr =
                 CStr::from_ptr(std::mem::transmute(SDL_HINT_RENDER_DRIVER.as_ptr()));
             SDL_SetHint(hint_render_driver.as_ptr(), cstr!("metal").as_ptr());
@@ -234,30 +223,68 @@ impl GpuDevice {
             SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
             check_sdl_error("SDL_Init");
 
-            p_window = SDL_CreateWindow(
+            let p_window = SDL_CreateWindow(
                 cstr!("Breakout!").as_ptr(),
                 SDL_WINDOWPOS_CENTERED,
                 SDL_WINDOWPOS_CENTERED,
-                window_width,
-                window_height,
+                width,
+                height,
                 (SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_METAL | SDL_WINDOW_RESIZABLE).0,
             );
             check_sdl_error("SDL_CreateWindow");
             assert_ne!(p_window, std::ptr::null_mut());
 
-            p_renderer = SDL_CreateRenderer(p_window, -1, 0);
+            let p_renderer = SDL_CreateRenderer(p_window, -1, 0);
             check_sdl_error("SDL_CreateRenderer");
             assert_ne!(p_renderer, std::ptr::null_mut());
-            SDL_SetRenderDrawColor(p_renderer, 0, 0, 0, 255);
 
-            let p_swapchain: *mut metal::CAMetalLayer =
-                SDL_RenderGetMetalLayer(p_renderer) as *mut _;
-            check_sdl_error("SDL_RenderGetMetalLayer");
-            assert_ne!(p_swapchain, std::ptr::null_mut());
-
-            metal_layer = MetalLayer::from_ptr(p_swapchain);
+            Self(Arc::new(WindowImpl {
+                p_window,
+                p_renderer,
+            }))
         }
+    }
 
+    pub fn show(&self) {
+        unsafe {
+            SDL_ShowWindow(self.0.p_window);
+            check_sdl_error("SDL_ShowWindow");
+        }
+    }
+}
+
+impl Window {
+    fn get_metal_layer(&self) -> MetalLayer {
+        use foreign_types_shared::ForeignType;
+
+        unsafe {
+            let p_metal_layer = SDL_RenderGetMetalLayer(self.0.p_renderer) as *mut _;
+            check_sdl_error("SDL_RenderGetMetalLayer");
+            assert_ne!(p_metal_layer, std::ptr::null_mut());
+
+            MetalLayer::from_ptr(p_metal_layer)
+        }
+    }
+}
+
+pub struct GpuDevice {
+    device: Device,
+    cmd_queue: CommandQueue,
+
+    // Pipeline state for {vs,fs}_instanced_quad
+    pipeline_state: RenderPipelineState,
+
+    metal_layer: MetalLayer,
+    window: Window,
+}
+
+impl GpuDevice {
+    pub fn new(window: &Window) -> Self {
+        let window = window.clone();
+        let device = Device::system_default().unwrap();
+        print_device_info(&device);
+
+        let metal_layer: MetalLayer = window.get_metal_layer();
         metal_layer.set_device(&device);
         metal_layer.set_pixel_format(MTLPixelFormat::BGRA8Unorm);
         metal_layer.set_framebuffer_only(true);
@@ -285,80 +312,7 @@ impl GpuDevice {
                 .unwrap();
         }
 
-        // Acquire drawable surface
-        let drawable = metal_layer.next_drawable().unwrap();
-
         let cmd_queue = device.new_command_queue();
-        let cmd_buffer = cmd_queue.new_command_buffer();
-
-        // Create Encoder
-        let encoder: &RenderCommandEncoderRef;
-        {
-            let render_pass_desc = RenderPassDescriptor::new();
-
-            let color_attachment = render_pass_desc.color_attachments().object_at(0).unwrap();
-            color_attachment.set_texture(Some(drawable.texture()));
-            color_attachment.set_load_action(MTLLoadAction::Clear);
-            color_attachment.set_clear_color(MTLClearColor {
-                red: 0.,
-                green: 0.,
-                blue: 0.,
-                alpha: 1.,
-            });
-
-            encoder = cmd_buffer.new_render_command_encoder(render_pass_desc);
-        }
-
-        // Record Encoder
-        {
-            use shaders::PerQuad;
-
-            encoder.set_render_pipeline_state(&pipeline_state);
-
-            let per_quad_data = vec![
-                PerQuad {
-                    pos: Vec2::new(-0.8, 0.8),
-                    color: Vec3::new(1., 0., 0.),
-                    ..Default::default()
-                },
-                PerQuad {
-                    pos: Vec2::new(0.8, -0.8),
-                    color: Vec3::new(0., 1., 0.),
-                    ..Default::default()
-                },
-                PerQuad {
-                    pos: Vec2::new(-0.8, -0.8),
-                    color: Vec3::new(0., 0., 1.),
-                    ..Default::default()
-                },
-                PerQuad {
-                    pos: Vec2::new(0.8, 0.8),
-                    color: Vec3::new(0.65, 0., 1.00),
-                    ..Default::default()
-                },
-            ];
-            let per_quad_buffer = device.new_buffer_with_data(
-                per_quad_data.as_ptr() as *const c_void,
-                (std::mem::size_of_val(&per_quad_data[0]) * per_quad_data.len()) as u64,
-                MTLResourceOptions::empty(),
-            );
-            // 6 vertices per quad
-            let tri_count = 6 * per_quad_data.len() as u64;
-
-            const PER_QUAD_BUFFER_IDX: u64 = 2;
-            encoder.set_vertex_buffer(PER_QUAD_BUFFER_IDX, Some(&per_quad_buffer), 0);
-            encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, tri_count);
-
-            encoder.end_encoding();
-        }
-
-        cmd_buffer.present_drawable(drawable);
-        cmd_buffer.commit();
-
-        unsafe {
-            SDL_ShowWindow(p_window);
-            check_sdl_error("SDL_ShowWindow");
-        }
 
         Self {
             device,
@@ -366,16 +320,53 @@ impl GpuDevice {
             pipeline_state,
 
             metal_layer,
-            p_window,
-            p_renderer,
+            window,
         }
+    }
+
+    pub fn render_and_present(&self, quads: &[shaders::PerQuad]) {
+        let drawable = self.metal_layer.next_drawable().unwrap();
+        let cmd_buffer = self.cmd_queue.new_command_buffer();
+
+        // Create & record Encoder
+        let render_pass_desc = RenderPassDescriptor::new();
+
+        let color_attachment = render_pass_desc.color_attachments().object_at(0).unwrap();
+        color_attachment.set_texture(Some(drawable.texture()));
+        color_attachment.set_load_action(MTLLoadAction::Clear);
+        color_attachment.set_clear_color(MTLClearColor {
+            red: 0.,
+            green: 0.,
+            blue: 0.,
+            alpha: 1.,
+        });
+
+        let encoder = cmd_buffer.new_render_command_encoder(render_pass_desc);
+        encoder.set_render_pipeline_state(&self.pipeline_state);
+
+        // TODO: Don't re-create a buffer per-frame
+        let quads_buffer = self.device.new_buffer_with_data(
+            quads.as_ptr() as *const c_void,
+            (std::mem::size_of_val(&quads[0]) * quads.len()) as u64,
+            MTLResourceOptions::empty(),
+        );
+        // 6 vertices per quad
+        let tri_count = 6 * quads.len() as u64;
+
+        encoder.set_vertex_buffer(shaders::BUFFER_IDX_PER_QUAD, Some(&quads_buffer), 0);
+        encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, tri_count);
+
+        encoder.end_encoding();
+
+        cmd_buffer.present_drawable(drawable);
+        cmd_buffer.commit();
     }
 }
 
 impl Drop for GpuDevice {
     fn drop(&mut self) {
+        // TODO: Shutdown correctly
         // unsafe {
-        //     TODO: Shutdown correctly
         //     SDL_DestroyRenderer(self.p_renderer);
         //     SDL_DestroyWindow(self.p_window);
         // }

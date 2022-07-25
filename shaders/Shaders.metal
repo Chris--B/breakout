@@ -1,5 +1,7 @@
 #include "Public.h"
 
+using namespace breakout;
+
 // Helper to get a compile-time array's length
 template <typename T, size_t N>
 constexpr size_t array_len(constant T const (&arr)[N]) {

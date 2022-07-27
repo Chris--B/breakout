@@ -245,6 +245,9 @@ impl Window {
             check_sdl_error("SDL_CreateWindow");
             assert_ne!(p_window, std::ptr::null_mut());
 
+            SDL_SetWindowMinimumSize(p_window, (3 * width) / 4, (3 * height) / 4);
+            check_sdl_error("SDL_SetWindowMinimumSize");
+
             let p_renderer = SDL_CreateRenderer(p_window, -1, 0);
             check_sdl_error("SDL_CreateRenderer");
             assert_ne!(p_renderer, std::ptr::null_mut());
@@ -287,6 +290,9 @@ pub struct GpuDevice {
 
     metal_layer: MetalLayer,
     window: Window,
+
+    view_width: f32,
+    view_height: f32,
 }
 
 impl GpuDevice {
@@ -332,6 +338,9 @@ impl GpuDevice {
 
             metal_layer,
             window,
+
+            view_width: 100.,
+            view_height: 100.,
         }
     }
 
@@ -357,10 +366,15 @@ impl GpuDevice {
 
         // TODO: Don't re-create buffers per-frame
         let view = shaders::View {
+            // scale our dimensions by half because this expects Vk's system which is larger than ours
+            // TODO: Don't do that.
             mat_view_proj: orthographic(
-                -5., 5., // left right
-                -5., 5., // bottom top
-                0., 1., // near far
+                0.,                      // left
+                0.5 * self.view_width,   // right
+                0.,                      // bottom
+                -0.5 * self.view_height, // top
+                0.,                      // near
+                1.,                      // far
             ),
         };
         let view_buffer = self.device.new_buffer_with_data(
@@ -386,6 +400,12 @@ impl GpuDevice {
 
         cmd_buffer.present_drawable(drawable);
         cmd_buffer.commit();
+    }
+
+    pub fn set_view(&mut self, width: f32, height: f32) {
+        dbg!(width, height);
+        self.view_width = width;
+        self.view_height = height;
     }
 }
 

@@ -2,7 +2,7 @@ use fermium::prelude::*;
 use metal::*;
 use objc::*;
 
-use ultraviolet::{Vec2, Vec3};
+use ultraviolet::{Mat4, Vec2, Vec3};
 
 use std::os::raw::c_void;
 use std::sync::Arc;
@@ -13,15 +13,25 @@ pub mod shaders {
 
     pub const SHADERS_BIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/Shaders.metallib"));
 
+    pub const BUFFER_IDX_VIEW: u64 = 1;
     pub const BUFFER_IDX_PER_QUAD: u64 = 2;
 
-    #[repr(C)]
+    #[repr(C, align(16))]
     #[derive(Copy, Clone, Debug)]
     pub struct View {
-        pub todo: f32,
+        pub mat_view_proj: Mat4,
     }
-    assert_eq_size!(View, [f32; 1]);
-    assert_eq_align!(View, f32);
+    assert_eq_size!(View, [f32; 16]);
+    // We force alignment, and no native types have 16-byte alignment, so skip the assert
+    // assert_eq_align!(View, X);
+
+    impl Default for View {
+        fn default() -> Self {
+            Self {
+                mat_view_proj: Mat4::identity(),
+            }
+        }
+    }
 
     #[repr(C)]
     #[derive(Copy, Clone, Debug)]
@@ -344,16 +354,25 @@ impl GpuDevice {
         let encoder = cmd_buffer.new_render_command_encoder(render_pass_desc);
         encoder.set_render_pipeline_state(&self.pipeline_state);
 
-        // TODO: Don't re-create a buffer per-frame
+        // TODO: Don't re-create buffers per-frame
+        let view = shaders::View::default();
+        let view_buffer = self.device.new_buffer_with_data(
+            &view as *const _ as *const c_void,
+            std::mem::size_of_val(&view) as u64,
+            MTLResourceOptions::empty(),
+        );
+
         let quads_buffer = self.device.new_buffer_with_data(
             quads.as_ptr() as *const c_void,
             (std::mem::size_of_val(&quads[0]) * quads.len()) as u64,
             MTLResourceOptions::empty(),
         );
+
+        encoder.set_vertex_buffer(shaders::BUFFER_IDX_VIEW, Some(&view_buffer), 0);
+        encoder.set_vertex_buffer(shaders::BUFFER_IDX_PER_QUAD, Some(&quads_buffer), 0);
+
         // 6 vertices per quad
         let tri_count = 6 * quads.len() as u64;
-
-        encoder.set_vertex_buffer(shaders::BUFFER_IDX_PER_QUAD, Some(&quads_buffer), 0);
         encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, tri_count);
 
         encoder.end_encoding();

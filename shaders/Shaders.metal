@@ -34,14 +34,12 @@ vertex VsInstancedQuadOut vs_instanced_quad(
 
     const PerQuad quad = per_quad[quad_id];
 
-    // "world" space position
+    // Construct world space position
     float2 pos = quad.pos + (quad.dims * quad_verts[vert_id]);
-
-    // TODO: viewport transform
-    pos *= 0.5; // lol should fix this
+    pos *= 0.5;
 
     VsInstancedQuadOut out;
-    out.pos = float4(pos, 0., 1.);
+    out.pos = view.matViewProj * float4(pos, 0., 1.);
     out.color = quad.color;
 
     return out;

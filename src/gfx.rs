@@ -27,7 +27,7 @@ pub mod shaders {
     #[derive(Copy, Clone, Debug)]
     pub struct PerQuad {
         pub pos: Vec2,
-        pub scale: Vec2,
+        pub dims: Vec2,
         pub color: Vec3,
     }
     assert_eq_size!(PerQuad, [f32; 2 + 2 + 3]);
@@ -37,7 +37,7 @@ pub mod shaders {
         fn default() -> Self {
             Self {
                 pos: Vec2::new(0., 0.),
-                scale: Vec2::new(1., 1.),
+                dims: Vec2::new(1., 1.),
                 color: Vec3::new(1., 0., 1.),
             }
         }

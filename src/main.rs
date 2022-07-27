@@ -13,6 +13,11 @@ fn poll_event() -> Option<SDL_Event> {
     }
 }
 
+const COLOR_RED: Vec3 = Vec3::new(1., 0., 0.);
+const COLOR_GREEN: Vec3 = Vec3::new(0., 1., 0.);
+const COLOR_BLUE: Vec3 = Vec3::new(0., 0., 1.);
+const COLOR_PURPLE: Vec3 = Vec3::new(0.65, 0., 1.00);
+
 fn main() {
     let window_width: i32 = 1_000;
     let window_height: i32 = 1_000;
@@ -23,22 +28,22 @@ fn main() {
     let quads = vec![
         PerQuad {
             pos: Vec2::new(-0.8, 0.8),
-            color: Vec3::new(1., 0., 0.),
+            color: COLOR_RED,
             ..Default::default()
         },
         PerQuad {
             pos: Vec2::new(0.8, -0.8),
-            color: Vec3::new(0., 1., 0.),
+            color: COLOR_GREEN,
             ..Default::default()
         },
         PerQuad {
             pos: Vec2::new(-0.8, -0.8),
-            color: Vec3::new(0., 0., 1.),
+            color: COLOR_BLUE,
             ..Default::default()
         },
         PerQuad {
             pos: Vec2::new(0.8, 0.8),
-            color: Vec3::new(0.65, 0., 1.00),
+            color: COLOR_PURPLE,
             ..Default::default()
         },
     ];

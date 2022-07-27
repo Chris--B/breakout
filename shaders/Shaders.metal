@@ -18,12 +18,12 @@ constant constexpr float2 quad_verts[] = {
     float2( 0.5f,  0.5f),
 };
 
-struct VsOut {
+struct VsInstancedQuadOut {
     float4 pos [[position]];
     float3 color;
 };
 
-vertex VsOut vs_instanced_quad(
+vertex VsInstancedQuadOut vs_instanced_quad(
            unsigned int        vid      [[vertex_id]],
     device View         const& view     [[buffer(BUFFER_IDX_VIEW)]],
     device PerQuad      const* per_quad [[buffer(BUFFER_IDX_PER_QUAD)]]
@@ -35,15 +35,12 @@ vertex VsOut vs_instanced_quad(
     const PerQuad quad = per_quad[quad_id];
 
     // "world" space position
-    float2 pos = quad_verts[vert_id];
-    pos *= quad.scale;
-    pos += quad.pos;
-
-    pos *= 0.5; // lol should fix this
+    float2 pos = quad.pos + (quad.dims * quad_verts[vert_id]);
 
     // TODO: viewport transform
+    pos *= 0.5; // lol should fix this
 
-    VsOut out;
+    VsInstancedQuadOut out;
     out.pos = float4(pos, 0., 1.);
     out.color = quad.color;
 
@@ -51,7 +48,7 @@ vertex VsOut vs_instanced_quad(
 }
 
 fragment float4 fs_instanced_quad(
-    VsOut input [[stage_in]]
+    VsInstancedQuadOut input [[stage_in]]
 ) {
     return float4(input.color, 1.0);
 }

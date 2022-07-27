@@ -13,7 +13,7 @@ namespace breakout {
 
     struct PerQuad {
         packed_float2 pos;
-        packed_float2 scale;
+        packed_float2 dims;
         packed_float3 color;
     };
     CheckSize(PerQuad, 4 * (2 + 2 + 3));

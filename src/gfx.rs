@@ -133,7 +133,6 @@ pub fn print_device_info(device: &DeviceRef) {
         MTLGPUFamily::Apple4,
         MTLGPUFamily::Apple5,
         MTLGPUFamily::Apple6,
-        // Not exposed through bindings yet
         MTLGPUFamily::Apple7,
         MTLGPUFamily::Apple8,
         MTLGPUFamily::Apple9,
@@ -149,15 +148,15 @@ pub fn print_device_info(device: &DeviceRef) {
 
     println!("    supported  texture sample count:");
     for count in 1.. {
-        if !device.supports_texture_sample_count(count) {
-            break;
-        }
-
         println!(
             "      {}? {}",
             count,
             check_or_x(device.supports_texture_sample_count(count))
         );
+
+        if !device.supports_texture_sample_count(count) {
+            break;
+        }
     }
     println!();
 

@@ -1,3 +1,6 @@
+// It's a fresh project and this isn't helpful
+#![allow(dead_code)]
+
 use fermium::prelude::*;
 use ultraviolet::{Vec2, Vec3};
 

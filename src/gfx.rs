@@ -2,6 +2,7 @@ use fermium::prelude::*;
 use metal::*;
 use objc::*;
 
+use ultraviolet::projection::lh_yup::orthographic_vk as orthographic;
 use ultraviolet::{Mat4, Vec2, Vec3};
 
 use std::os::raw::c_void;
@@ -355,7 +356,13 @@ impl GpuDevice {
         encoder.set_render_pipeline_state(&self.pipeline_state);
 
         // TODO: Don't re-create buffers per-frame
-        let view = shaders::View::default();
+        let view = shaders::View {
+            mat_view_proj: orthographic(
+                -5., 5., // left right
+                -5., 5., // bottom top
+                0., 1., // near far
+            ),
+        };
         let view_buffer = self.device.new_buffer_with_data(
             &view as *const _ as *const c_void,
             std::mem::size_of_val(&view) as u64,

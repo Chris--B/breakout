@@ -245,8 +245,63 @@ impl Window {
             check_sdl_error("SDL_CreateWindow");
             assert_ne!(p_window, std::ptr::null_mut());
 
+            let mut wm_info = SDL_SysWMinfo::default();
+            SDL_VERSION(&mut wm_info.version);
+            SDL_GetWindowWMInfo(p_window, &mut wm_info);
+
+            let SDL_version {
+                major,
+                minor,
+                patch,
+            } = wm_info.version;
+            println!("SDL Version: {major}.{minor}.{patch}");
+
+            // Minor usability nits
             SDL_SetWindowMinimumSize(p_window, (3 * width) / 4, (3 * height) / 4);
             check_sdl_error("SDL_SetWindowMinimumSize");
+
+            {
+                use objc::runtime::Object;
+                let subsystem = match wm_info.subsystem {
+                    SDL_SYSWM_UNKNOWN => "SDL_SYSWM_UNKNOWN",
+                    SDL_SYSWM_WINDOWS => "SDL_SYSWM_WINDOWS",
+                    SDL_SYSWM_X11 => "SDL_SYSWM_X11",
+                    SDL_SYSWM_DIRECTFB => "SDL_SYSWM_DIRECTFB",
+                    SDL_SYSWM_COCOA => "SDL_SYSWM_COCOA",
+                    SDL_SYSWM_UIKIT => "SDL_SYSWM_UIKIT",
+                    SDL_SYSWM_WAYLAND => "SDL_SYSWM_WAYLAND",
+                    SDL_SYSWM_MIR => "SDL_SYSWM_MIR",
+                    SDL_SYSWM_WINRT => "SDL_SYSWM_WINRT",
+                    SDL_SYSWM_ANDROID => "SDL_SYSWM_ANDROID",
+                    SDL_SYSWM_VIVANTE => "SDL_SYSWM_VIVANTE",
+
+                    _ => "SDL_SYSWM_UNKNOWN",
+                };
+                println!("SDL subsystem: {subsystem}");
+
+                // We need to assign the return value so msg_send!() can infer the right types.
+                // But there is no return value on a setter like this, so silence clippy's warning.
+                #[allow(clippy::let_unit_value)]
+                if wm_info.subsystem == SDL_SYSWM_COCOA {
+                    // If we're using Cocoa, do some sketchy message sending to fix the aspect ratio on resize
+                    #[repr(C)]
+                    #[derive(Copy, Clone, Debug)]
+                    struct NSSize {
+                        width: f64,
+                        height: f64,
+                    }
+
+                    let cocoa_window: &Object = &*(wm_info.info.cocoa.window as *const _);
+                    let aspect_ratio = NSSize {
+                        width: width as f64,
+                        height: height as f64,
+                    };
+                    let _: () = msg_send![cocoa_window, setAspectRatio: aspect_ratio];
+                } else {
+                    // Other window managers are ignored, and resizing can look funny instead.
+                    println!("SDL WM subsystem isn't cocoa, so we're not locking aspect ratio");
+                }
+            }
 
             let p_renderer = SDL_CreateRenderer(p_window, -1, 0);
             check_sdl_error("SDL_CreateRenderer");

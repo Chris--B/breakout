@@ -13,40 +13,70 @@ fn poll_event() -> Option<SDL_Event> {
     }
 }
 
-const COLOR_RED: Vec3 = Vec3::new(1., 0., 0.);
-const COLOR_GREEN: Vec3 = Vec3::new(0., 1., 0.);
-const COLOR_BLUE: Vec3 = Vec3::new(0., 0., 1.);
-const COLOR_PURPLE: Vec3 = Vec3::new(0.65, 0., 1.00);
+pub mod color {
+    use super::*;
+
+    pub const WHITE: Vec3 = Vec3::new(0.84, 0.84, 0.84);
+
+    pub const RED: Vec3 = Vec3::new(0.60, 0., 0.);
+    pub const ORANGE: Vec3 = Vec3::new(0.84, 0.60, 0.);
+    pub const GREEN: Vec3 = Vec3::new(0., 0.60, 0.);
+    pub const YELLOW: Vec3 = Vec3::new(0.80, 0.80, 0.);
+
+    pub const OHNO_PINK: Vec3 = Vec3::new(1., 0., 1.);
+}
 
 fn main() {
-    let window_width: i32 = 1_000;
-    let window_height: i32 = 1_000;
+    let window_width: i32 = 500;
+    let window_height: i32 = 750;
     let window = gfx::Window::new(window_width, window_height);
 
-    let gpu = gfx::GpuDevice::new(&window);
+    let mut gpu = gfx::GpuDevice::new(&window);
 
-    let quads = vec![
-        PerQuad {
-            pos: Vec2::new(-0.8, 0.8),
-            color: COLOR_RED,
-            ..Default::default()
-        },
-        PerQuad {
-            pos: Vec2::new(0.8, -0.8),
-            color: COLOR_GREEN,
-            ..Default::default()
-        },
-        PerQuad {
-            pos: Vec2::new(-0.8, -0.8),
-            color: COLOR_BLUE,
-            ..Default::default()
-        },
-        PerQuad {
-            pos: Vec2::new(0.8, 0.8),
-            color: COLOR_PURPLE,
-            ..Default::default()
-        },
-    ];
+    let mut quads = vec![];
+
+    // Shape of a brick & the paddle
+    let dims = Vec2::new(5., 1.);
+
+    // for the board
+    let view_x = (dims.x + 1.) * 14. + 1.;
+    let view_y = view_x * (window_height as f32 / window_width as f32);
+    gpu.set_view(view_x, view_y);
+
+    // (x, y) are position in the grid
+    for y in 0..8 {
+        let color: Vec3 = match y {
+            0..=1 => color::RED,
+            2..=3 => color::ORANGE,
+            4..=5 => color::GREEN,
+            6..=7 => color::YELLOW,
+            _ => color::OHNO_PINK,
+        };
+        for x in 0..14 {
+            // Note: Our x coordinate here must match the calculation for view_x above
+            let pos_x = (dims.x + 1.) * (x as f32) + 1.;
+            let pos_y = view_y - (dims.y + 1.) * (y as f32 + 1.);
+            let pos = Vec2::new(pos_x, pos_y);
+
+            quads.push(PerQuad { pos, color, dims });
+        }
+    }
+
+    // paddle
+    let paddle_pos = Vec2::new(0.5 * view_x - dims.x / 2., 0.05 * view_y);
+    quads.push(PerQuad {
+        pos: paddle_pos,
+        color: color::WHITE,
+        dims,
+    });
+
+    // ball
+    let ball_pos = paddle_pos + Vec2::new(0.5 * dims.x - 0.5, 3. * dims.y);
+    quads.push(PerQuad {
+        pos: ball_pos,
+        color: color::WHITE,
+        dims: Vec2::new(1., 1.),
+    });
 
     window.show();
     'main_loop: loop {

@@ -35,7 +35,8 @@ vertex VsInstancedQuadOut vs_instanced_quad(
     const PerQuad quad = per_quad[quad_id];
 
     // Construct world space position
-    float2 pos = quad.pos + (quad.dims * quad_verts[vert_id]);
+    float2 vert = quad_verts[vert_id] + float2(0.5);
+    float2 pos = quad.pos + (quad.dims * vert);
     pos *= 0.5;
 
     VsInstancedQuadOut out;

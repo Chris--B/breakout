@@ -403,7 +403,6 @@ impl GpuDevice {
     }
 
     pub fn set_view(&mut self, width: f32, height: f32) {
-        dbg!(width, height);
         self.view_width = width;
         self.view_height = height;
     }

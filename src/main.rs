@@ -206,10 +206,6 @@ fn main() {
                                 world.remove(quad);
                             }
                         }
-
-                        // Figure out which side made contact
-
-                        // Reverse ball's velocity along that side
                     }
                 }
             }
@@ -218,12 +214,12 @@ fn main() {
         // Render
         use gfx::shaders::PerQuad;
 
-        // Build quads for the renderer
         {
+            // Build quads for the renderer
             let mut query = <(&Position, &DrawableColoredQuad)>::query();
-            for (pos, drawable) in query.iter(&world) {
+            for (Position(pos), drawable) in query.iter(&world) {
                 quads.push(PerQuad {
-                    pos: pos.0,
+                    pos: *pos,
                     dims: drawable.dims,
                     color: drawable.color,
                 });

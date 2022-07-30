@@ -68,6 +68,7 @@ fn main() {
                 Position(pos),
                 HitableQuad { dims },
                 DrawableColoredQuad { dims, color },
+                Breakable,
             ));
         }
     }
@@ -92,7 +93,7 @@ fn main() {
     let _ball = world.push((
         Name(format!("Ball-#{ball_count}")),
         Position(ball_pos),
-        Velocity(Vec2::new(1., 40.)),
+        Velocity(Vec2::new(0., 100.)),
         HitableQuad { dims: ball_dims },
         DrawableColoredQuad {
             dims: ball_dims,
@@ -137,6 +138,69 @@ fn main() {
                 let mut query = <(&mut Position, &Velocity)>::query();
                 for (Position(pos), Velocity(vel)) in query.iter_mut(&mut world) {
                     (*pos) += dt * *vel;
+                }
+            }
+
+            // Check if the ball is colliding with anything
+            // Note: Balls do not interact with other balls
+            {
+                let mut ball_query =
+                    <(Entity, &Position, &HitableQuad)>::query().filter(component::<Ball>());
+                let mut hitable_query =
+                    <(Entity, &Position, &HitableQuad)>::query().filter(!component::<Ball>());
+
+                let mut hits: Vec<(Entity, Entity)> = vec![];
+                for (ball, Position(ball_pos), ball_quad) in ball_query.iter(&world) {
+                    let ball_aabb_min =
+                        Vec2::min_by_component(*ball_pos, *ball_pos + ball_quad.dims);
+                    let ball_aabb_max =
+                        Vec2::max_by_component(*ball_pos, *ball_pos + ball_quad.dims);
+
+                    for (hitter, Position(pos), quad) in hitable_query.iter(&world) {
+                        // Broken collides math: Expects the ball to be smaller than what its hitting.
+                        let aabb_min = Vec2::min_by_component(*pos, *pos + quad.dims);
+                        let aabb_max = Vec2::max_by_component(*pos, *pos + quad.dims);
+
+                        let overlaps_x =
+                            // Left corners
+                            (aabb_min.x <= ball_aabb_min.x && ball_aabb_min.x <= aabb_max.x) ||
+
+                            // Right corners
+                            (aabb_min.x <= ball_aabb_max.x && ball_aabb_max.x <= aabb_max.x);
+
+                        let overlaps_y =
+                            // Bottom corners
+                            (aabb_min.y <= ball_aabb_min.y && ball_aabb_min.y <= aabb_max.y) ||
+
+                            // Top corners
+                            (aabb_min.y <= ball_aabb_max.y && ball_aabb_max.y <= aabb_max.y);
+
+                        let collides = overlaps_x && overlaps_y;
+
+                        if collides {
+                            hits.push((*ball, *hitter));
+                        }
+                    }
+                }
+
+                if !hits.is_empty() {
+                    for (_ball, quad) in hits {
+                        // TODO: Bounce the ball ONCE per axis per frame
+
+                        // If the thing we hit is Breakable, remove it
+                        if world
+                            .entry(quad)
+                            .unwrap()
+                            .get_component::<Breakable>()
+                            .is_ok()
+                        {
+                            world.remove(quad);
+                        }
+                    }
+
+                    // Figure out which side made contact
+
+                    // Reverse ball's velocity along that side
                 }
             }
         }

@@ -25,3 +25,6 @@ pub struct Ball;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Paddle;
+
+#[derive(Copy, Clone, Debug)]
+pub struct Breakable;

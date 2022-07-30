@@ -47,7 +47,7 @@ fn main() {
     gpu.set_view(view_x, view_y);
 
     // (x, y) are position in the grid
-    for y in 0..8 {
+    for y in 0..55 {
         let color: Vec3 = match y {
             0..=1 => color::RED,
             2..=3 => color::ORANGE,

@@ -415,42 +415,44 @@ impl GpuDevice {
             alpha: 1.,
         });
 
-        let encoder = cmd_buffer.new_render_command_encoder(render_pass_desc);
-        encoder.set_render_pipeline_state(&self.pipeline_state);
+        if !quads.is_empty() {
+            let encoder = cmd_buffer.new_render_command_encoder(render_pass_desc);
+            encoder.set_render_pipeline_state(&self.pipeline_state);
 
-        // TODO: Don't re-create buffers per-frame
-        let view = shaders::View {
-            // scale our dimensions by half because this expects Vk's system which is larger than ours
-            // TODO: Don't do that.
-            mat_view_proj: orthographic(
-                0.,                      // left
-                0.5 * self.view_width,   // right
-                0.,                      // bottom
-                -0.5 * self.view_height, // top
-                0.,                      // near
-                1.,                      // far
-            ),
-        };
-        let view_buffer = self.device.new_buffer_with_data(
-            &view as *const _ as *const c_void,
-            std::mem::size_of_val(&view) as u64,
-            MTLResourceOptions::empty(),
-        );
+            // TODO: Don't re-create buffers per-frame
+            let view = shaders::View {
+                // scale our dimensions by half because this expects Vk's system which is larger than ours
+                // TODO: Don't do that.
+                mat_view_proj: orthographic(
+                    0.,                      // left
+                    0.5 * self.view_width,   // right
+                    0.,                      // bottom
+                    -0.5 * self.view_height, // top
+                    0.,                      // near
+                    1.,                      // far
+                ),
+            };
+            let view_buffer = self.device.new_buffer_with_data(
+                &view as *const _ as *const c_void,
+                std::mem::size_of_val(&view) as u64,
+                MTLResourceOptions::empty(),
+            );
 
-        let quads_buffer = self.device.new_buffer_with_data(
-            quads.as_ptr() as *const c_void,
-            (std::mem::size_of_val(&quads[0]) * quads.len()) as u64,
-            MTLResourceOptions::empty(),
-        );
+            let quads_buffer = self.device.new_buffer_with_data(
+                quads.as_ptr() as *const c_void,
+                (std::mem::size_of_val(&quads[0]) * quads.len()) as u64,
+                MTLResourceOptions::empty(),
+            );
 
-        encoder.set_vertex_buffer(shaders::BUFFER_IDX_VIEW, Some(&view_buffer), 0);
-        encoder.set_vertex_buffer(shaders::BUFFER_IDX_PER_QUAD, Some(&quads_buffer), 0);
+            encoder.set_vertex_buffer(shaders::BUFFER_IDX_VIEW, Some(&view_buffer), 0);
+            encoder.set_vertex_buffer(shaders::BUFFER_IDX_PER_QUAD, Some(&quads_buffer), 0);
 
-        // 6 vertices per quad
-        let tri_count = 6 * quads.len() as u64;
-        encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, tri_count);
+            // 6 vertices per quad
+            let tri_count = 6 * quads.len() as u64;
+            encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, tri_count);
 
-        encoder.end_encoding();
+            encoder.end_encoding();
+        }
 
         cmd_buffer.present_drawable(drawable);
         cmd_buffer.commit();

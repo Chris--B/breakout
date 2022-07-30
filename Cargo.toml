@@ -23,3 +23,15 @@ ultraviolet = { version = "0.9", features = [ "bytemuck", "f64", "int"] }
 
 # Misc
 static_assertions = "1.1"
+
+
+# Enable minimal optimizations for our debug code
+[profile.dev]
+opt-level = 1
+
+# Enable aggressive optimizations for all dependencies all of the time
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release.package."*"]
+opt-level = 3

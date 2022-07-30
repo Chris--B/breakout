@@ -105,13 +105,15 @@ fn main() {
     // Hoisted out of the loop to reuse the allocation
     let mut quads = Vec::with_capacity(world.len());
 
+    let mut paused = false;
     window.show();
 
     'main_loop: loop {
         // Handle events
         while let Some(e) = poll_event() {
             // Access to unions is unsafe, so this match block is going to get spicy
-            match unsafe { e.type_ } {
+            let type_ = unsafe { e.type_ };
+            match type_ {
                 // Immediately quit everything - unhandled events are forever ignored
                 SDL_QUIT => {
                     break 'main_loop;
@@ -121,6 +123,11 @@ fn main() {
                     let key = unsafe { e.key };
                     if key.keysym.sym == SDLK_q {
                         break 'main_loop;
+                    }
+
+                    if (type_ == SDL_KEYDOWN) && (key.repeat == 0) && (key.keysym.sym == SDLK_SPACE)
+                    {
+                        paused = !paused;
                     }
                 }
 
@@ -132,75 +139,78 @@ fn main() {
         // Update gamestate
         const DELAY_MS: u32 = 5;
         let dt = (DELAY_MS as f32) * 1e-3;
-        {
-            // Update ball positions
+
+        if !paused {
             {
-                let mut query = <(&mut Position, &Velocity)>::query();
-                for (Position(pos), Velocity(vel)) in query.iter_mut(&mut world) {
-                    (*pos) += dt * *vel;
-                }
-            }
-
-            // Check if the ball is colliding with anything
-            // Note: Balls do not interact with other balls
-            {
-                let mut ball_query =
-                    <(Entity, &Position, &HitableQuad)>::query().filter(component::<Ball>());
-                let mut hitable_query =
-                    <(Entity, &Position, &HitableQuad)>::query().filter(!component::<Ball>());
-
-                let mut hits: Vec<(Entity, Entity)> = vec![];
-                for (ball, Position(ball_pos), ball_quad) in ball_query.iter(&world) {
-                    let ball_aabb_min =
-                        Vec2::min_by_component(*ball_pos, *ball_pos + ball_quad.dims);
-                    let ball_aabb_max =
-                        Vec2::max_by_component(*ball_pos, *ball_pos + ball_quad.dims);
-
-                    for (hitter, Position(pos), quad) in hitable_query.iter(&world) {
-                        // Broken collides math: Expects the ball to be smaller than what its hitting.
-                        let aabb_min = Vec2::min_by_component(*pos, *pos + quad.dims);
-                        let aabb_max = Vec2::max_by_component(*pos, *pos + quad.dims);
-
-                        let overlaps_x =
-                            // Left corners
-                            (aabb_min.x <= ball_aabb_min.x && ball_aabb_min.x <= aabb_max.x) ||
-
-                            // Right corners
-                            (aabb_min.x <= ball_aabb_max.x && ball_aabb_max.x <= aabb_max.x);
-
-                        let overlaps_y =
-                            // Bottom corners
-                            (aabb_min.y <= ball_aabb_min.y && ball_aabb_min.y <= aabb_max.y) ||
-
-                            // Top corners
-                            (aabb_min.y <= ball_aabb_max.y && ball_aabb_max.y <= aabb_max.y);
-
-                        let collides = overlaps_x && overlaps_y;
-
-                        if collides {
-                            hits.push((*ball, *hitter));
-                        }
+                // Update ball positions
+                {
+                    let mut query = <(&mut Position, &Velocity)>::query();
+                    for (Position(pos), Velocity(vel)) in query.iter_mut(&mut world) {
+                        (*pos) += dt * *vel;
                     }
                 }
 
-                if !hits.is_empty() {
-                    for (_ball, quad) in hits {
-                        // TODO: Bounce the ball ONCE per axis per frame
+                // Check if the ball is colliding with anything
+                // Note: Balls do not interact with other balls
+                {
+                    let mut ball_query =
+                        <(Entity, &Position, &HitableQuad)>::query().filter(component::<Ball>());
+                    let mut hitable_query =
+                        <(Entity, &Position, &HitableQuad)>::query().filter(!component::<Ball>());
 
-                        // If the thing we hit is Breakable, remove it
-                        if world
-                            .entry(quad)
-                            .unwrap()
-                            .get_component::<Breakable>()
-                            .is_ok()
-                        {
-                            world.remove(quad);
+                    let mut hits: Vec<(Entity, Entity)> = vec![];
+                    for (ball, Position(ball_pos), ball_quad) in ball_query.iter(&world) {
+                        let ball_aabb_min =
+                            Vec2::min_by_component(*ball_pos, *ball_pos + ball_quad.dims);
+                        let ball_aabb_max =
+                            Vec2::max_by_component(*ball_pos, *ball_pos + ball_quad.dims);
+
+                        for (hitter, Position(pos), quad) in hitable_query.iter(&world) {
+                            // Broken collides math: Expects the ball to be smaller than what its hitting.
+                            let aabb_min = Vec2::min_by_component(*pos, *pos + quad.dims);
+                            let aabb_max = Vec2::max_by_component(*pos, *pos + quad.dims);
+
+                            let overlaps_x =
+                                // Left corners
+                                (aabb_min.x <= ball_aabb_min.x && ball_aabb_min.x <= aabb_max.x) ||
+
+                                // Right corners
+                                (aabb_min.x <= ball_aabb_max.x && ball_aabb_max.x <= aabb_max.x);
+
+                            let overlaps_y =
+                                // Bottom corners
+                                (aabb_min.y <= ball_aabb_min.y && ball_aabb_min.y <= aabb_max.y) ||
+
+                                // Top corners
+                                (aabb_min.y <= ball_aabb_max.y && ball_aabb_max.y <= aabb_max.y);
+
+                            let collides = overlaps_x && overlaps_y;
+
+                            if collides {
+                                hits.push((*ball, *hitter));
+                            }
                         }
                     }
 
-                    // Figure out which side made contact
+                    if !hits.is_empty() {
+                        for (_ball, quad) in hits {
+                            // TODO: Bounce the ball ONCE per axis per frame
 
-                    // Reverse ball's velocity along that side
+                            // If the thing we hit is Breakable, remove it
+                            if world
+                                .entry(quad)
+                                .unwrap()
+                                .get_component::<Breakable>()
+                                .is_ok()
+                            {
+                                world.remove(quad);
+                            }
+                        }
+
+                        // Figure out which side made contact
+
+                        // Reverse ball's velocity along that side
+                    }
                 }
             }
         }

@@ -2,10 +2,13 @@
 #![allow(dead_code)]
 
 use fermium::prelude::*;
+use legion::*;
 use ultraviolet::{Vec2, Vec3};
 
+mod ecs;
 mod gfx;
-use gfx::shaders::PerQuad;
+
+use ecs::*;
 
 fn poll_event() -> Option<SDL_Event> {
     let mut e = SDL_Event::default();
@@ -32,11 +35,10 @@ pub mod color {
 fn main() {
     let window_width: i32 = 500;
     let window_height: i32 = 750;
+
     let window = gfx::Window::new(window_width, window_height);
-
     let mut gpu = gfx::GpuDevice::new(&window);
-
-    let mut quads = vec![];
+    let mut world = World::default();
 
     // Shape of a brick & the paddle
     let dims = Vec2::new(5., 1.);
@@ -61,27 +63,49 @@ fn main() {
             let pos_y = view_y - (dims.y + 1.) * (y as f32 + 1.);
             let pos = Vec2::new(pos_x, pos_y);
 
-            quads.push(PerQuad { pos, color, dims });
+            world.push((
+                Name(format!("Brick@({pos_x}, {pos_y})")),
+                Position(pos),
+                HitableQuad { dims },
+                DrawableColoredQuad { dims, color },
+            ));
         }
     }
 
     // paddle
     let paddle_pos = Vec2::new(0.5 * view_x - dims.x / 2., 0.05 * view_y);
-    quads.push(PerQuad {
-        pos: paddle_pos,
-        color: color::WHITE,
-        dims,
-    });
+    let _paddle = world.push((
+        Name("Paddle".to_string()),
+        Position(paddle_pos),
+        HitableQuad { dims },
+        DrawableColoredQuad {
+            dims,
+            color: color::WHITE,
+        },
+        Paddle,
+    ));
 
     // ball
     let ball_pos = paddle_pos + Vec2::new(0.5 * dims.x - 0.5, 3. * dims.y);
-    quads.push(PerQuad {
-        pos: ball_pos,
-        color: color::WHITE,
-        dims: Vec2::new(1., 1.),
-    });
+    let ball_dims = Vec2::new(1., 1.);
+    let ball_count = 1;
+    let _ball = world.push((
+        Name(format!("Ball-#{ball_count}")),
+        Position(ball_pos),
+        Velocity(Vec2::new(1., 40.)),
+        HitableQuad { dims: ball_dims },
+        DrawableColoredQuad {
+            dims: ball_dims,
+            color: color::WHITE,
+        },
+        Ball,
+    ));
+
+    // Hoisted out of the loop to reuse the allocation
+    let mut quads = Vec::with_capacity(world.len());
 
     window.show();
+
     'main_loop: loop {
         // Handle events
         while let Some(e) = poll_event() {
@@ -104,11 +128,40 @@ fn main() {
             }
         }
 
-        // Render
-        unsafe {
-            gpu.render_and_present(&quads);
+        // Update gamestate
+        const DELAY_MS: u32 = 5;
+        let dt = (DELAY_MS as f32) * 1e-3;
+        {
+            // Update ball positions
+            {
+                let mut query = <(&mut Position, &Velocity)>::query();
+                for (Position(pos), Velocity(vel)) in query.iter_mut(&mut world) {
+                    (*pos) += dt * *vel;
+                }
+            }
+        }
 
-            SDL_Delay(100); // TODO: Delay better
+        // Render
+        use gfx::shaders::PerQuad;
+
+        // Build quads for the renderer
+        {
+            let mut query = <(&Position, &DrawableColoredQuad)>::query();
+            for (pos, drawable) in query.iter(&world) {
+                quads.push(PerQuad {
+                    pos: pos.0,
+                    dims: drawable.dims,
+                    color: drawable.color,
+                });
+            }
+
+            gpu.render_and_present(&quads);
+            quads.clear();
+        }
+
+        // TODO: Better delay
+        unsafe {
+            SDL_Delay(DELAY_MS);
         }
     }
 

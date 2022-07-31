@@ -176,19 +176,25 @@ fn main() {
                     let mut ball_query =
                         <(Entity, &Position, &HitableQuad)>::query().filter(component::<Ball>());
                     let mut hitable_query =
-                        <(Entity, &Position, &HitableQuad)>::query().filter(!component::<Ball>());
+                        <(Entity, &Position, &HitableQuad, Option<&Breakable>)>::query()
+                            .filter(!component::<Ball>());
 
-                    let mut hits: Vec<(Entity, Entity)> = vec![];
+                    let mut breakables_hit = vec![];
+                    let mut needs_bounce = vec![];
+
                     for (ball, Position(ball_pos), ball_quad) in ball_query.iter(&world) {
-                        let ball_aabb_min =
-                            Vec2::min_by_component(*ball_pos, *ball_pos + ball_quad.dims);
-                        let ball_aabb_max =
-                            Vec2::max_by_component(*ball_pos, *ball_pos + ball_quad.dims);
+                        let ball_aabb_min = ball_pos.min_by_component(*ball_pos + ball_quad.dims);
+                        let ball_aabb_max = ball_pos.max_by_component(*ball_pos + ball_quad.dims);
 
-                        for (hitter, Position(pos), quad) in hitable_query.iter(&world) {
+                        let mut bounce_x_dir = false;
+                        let mut bounce_y_dir = false;
+
+                        for (hitter, Position(pos), quad, maybe_breakable) in
+                            hitable_query.iter(&world)
+                        {
                             // Broken collides math: Expects the ball to be smaller than what its hitting.
-                            let aabb_min = Vec2::min_by_component(*pos, *pos + quad.dims);
-                            let aabb_max = Vec2::max_by_component(*pos, *pos + quad.dims);
+                            let aabb_min = pos.min_by_component(*pos + quad.dims);
+                            let aabb_max = pos.max_by_component(*pos + quad.dims);
 
                             let overlaps_x =
                                 // Left corners
@@ -207,23 +213,35 @@ fn main() {
                             let collides = overlaps_x && overlaps_y;
 
                             if collides {
-                                hits.push((*ball, *hitter));
+                                // Note: X & Y here cross map
+                                bounce_x_dir = overlaps_y;
+                                bounce_y_dir = overlaps_x;
+
+                                if maybe_breakable.is_some() {
+                                    breakables_hit.push(*hitter);
+                                }
                             }
+                        }
+
+                        if bounce_x_dir || bounce_y_dir {
+                            needs_bounce.push((*ball, bounce_x_dir, bounce_y_dir));
                         }
                     }
 
-                    if !hits.is_empty() {
-                        for (_ball, quad) in hits {
-                            // TODO: Bounce the ball ONCE per axis per frame
+                    for breakable in breakables_hit {
+                        world.remove(breakable);
+                    }
 
-                            // If the thing we hit is Breakable, remove it
-                            if world
-                                .entry(quad)
-                                .unwrap()
-                                .get_component::<Breakable>()
-                                .is_ok()
-                            {
-                                world.remove(quad);
+                    for (ball, bounce_x_dir, bounce_y_dir) in needs_bounce {
+                        if let Ok(Velocity(vel)) =
+                            world.entry(ball).unwrap().get_component_mut::<Velocity>()
+                        {
+                            if bounce_x_dir {
+                                vel.x *= -1.
+                            }
+
+                            if bounce_y_dir {
+                                vel.y *= -1.
                             }
                         }
                     }

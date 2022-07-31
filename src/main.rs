@@ -73,29 +73,30 @@ fn main() {
         }
     }
 
-    // paddle
+    // Add a user-controlled paddle
     let paddle_pos = Vec2::new(0.5 * view_x - dims.x / 2., 0.05 * view_y);
-    let _paddle = world.push((
+    let paddle_dims = dims;
+    world.push((
         Name("Paddle".to_string()),
         Position(paddle_pos),
-        HitableQuad { dims },
+        HitableQuad { dims: paddle_dims },
         DrawableColoredQuad {
-            dims,
+            dims: paddle_dims,
             color: color::WHITE,
         },
         Paddle,
     ));
 
-    // ball
     let mut ball_count = 0;
 
-    let ball_pos = paddle_pos + Vec2::new(0.5 * dims.x - 0.5, 3. * dims.y);
-    let ball_dims = Vec2::new(1., 1.);
+    // Spawn a starter ball
     ball_count += 1;
-    let _ball = world.push((
+    let ball_pos = paddle_pos + Vec2::new(0.5 * paddle_dims.x - 0.5, 3. * paddle_dims.y);
+    let ball_dims = Vec2::new(1., 1.);
+    world.push((
         Name(format!("Ball-#{ball_count}")),
         Position(ball_pos),
-        Velocity(Vec2::new(0., 135.)),
+        Velocity(Vec2::new(100., 35.)),
         HitableQuad { dims: ball_dims },
         DrawableColoredQuad {
             dims: ball_dims,
@@ -140,7 +141,7 @@ fn main() {
                         let _ball = world.push((
                             Name(format!("Ball-#{ball_count}")),
                             Position(ball_pos),
-                            Velocity(Vec2::new(0., 135.)),
+                            Velocity(Vec2::new(100., 35.)),
                             HitableQuad { dims: ball_dims },
                             DrawableColoredQuad {
                                 dims: ball_dims,

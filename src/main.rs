@@ -260,6 +260,18 @@ fn main() {
                             Ball,
                         ));
                     }
+
+                    // Clear all balls when "C" is pressed
+                    if (type_ == SDL_KEYDOWN) && (key.repeat == 0) && (key.keysym.sym == SDLK_c) {
+                        let mut query = <(Entity, &Ball)>::query();
+                        let balls: Vec<_> = query.iter(&world).map(|(e, _)| *e).collect();
+                        let ball_count = balls.len();
+                        for ball in balls {
+                            world.remove(ball);
+                        }
+
+                        println!("Removed {ball_count} balls");
+                    }
                 }
 
                 // Ignore all other events

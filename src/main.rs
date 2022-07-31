@@ -87,13 +87,15 @@ fn main() {
     ));
 
     // ball
+    let mut ball_count = 0;
+
     let ball_pos = paddle_pos + Vec2::new(0.5 * dims.x - 0.5, 3. * dims.y);
     let ball_dims = Vec2::new(1., 1.);
-    let ball_count = 1;
+    ball_count += 1;
     let _ball = world.push((
         Name(format!("Ball-#{ball_count}")),
         Position(ball_pos),
-        Velocity(Vec2::new(0., 100.)),
+        Velocity(Vec2::new(0., 135.)),
         HitableQuad { dims: ball_dims },
         DrawableColoredQuad {
             dims: ball_dims,
@@ -121,17 +123,35 @@ fn main() {
 
                 SDL_KEYDOWN | SDL_KEYUP => {
                     let key = unsafe { e.key };
+
+                    // Quit the app when "Q" is pressed
                     if key.keysym.sym == SDLK_q {
                         break 'main_loop;
                     }
 
+                    // Toggle the simulation update when SPACE is pressed
                     if (type_ == SDL_KEYDOWN) && (key.repeat == 0) && (key.keysym.sym == SDLK_SPACE)
                     {
                         paused = !paused;
                     }
+
+                    // Spawn a ball when "B" is pressed
+                    if (type_ == SDL_KEYDOWN) && (key.repeat == 0) && (key.keysym.sym == SDLK_b) {
+                        let _ball = world.push((
+                            Name(format!("Ball-#{ball_count}")),
+                            Position(ball_pos),
+                            Velocity(Vec2::new(0., 135.)),
+                            HitableQuad { dims: ball_dims },
+                            DrawableColoredQuad {
+                                dims: ball_dims,
+                                color: color::WHITE,
+                            },
+                            Ball,
+                        ));
+                    }
                 }
 
-                // Ignore unhandled events
+                // Ignore all other events
                 _ => {}
             }
         }

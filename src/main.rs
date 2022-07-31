@@ -38,6 +38,12 @@ struct Aabb {
     max: Vec2,
 }
 
+struct HitInfo {
+    time: f32,
+    pos: Vec2,
+    normal: Vec2,
+}
+
 impl Aabb {
     pub fn new_from_quad(pos: Vec2, dims: Vec2) -> Self {
         let min = Vec2::min_by_component(pos, pos + dims);
@@ -46,22 +52,83 @@ impl Aabb {
         Self { min, max }
     }
 
+    pub fn center(&self) -> Vec2 {
+        0.5 * (self.max + self.min)
+    }
+
+    pub fn half_extents(&self) -> Vec2 {
+        0.5 * (self.max - self.min)
+    }
+
+    pub fn intersects_with_line(
+        &self,
+        pos: Vec2,
+        delta: Vec2,
+        padding: Option<Vec2>,
+    ) -> Option<HitInfo> {
+        let padding = padding.unwrap_or_default();
+
+        fn sign(x: f32) -> f32 {
+            if x < 0. {
+                return -1.;
+            }
+            if x > 0. {
+                return 1.;
+            }
+
+            // 0. and NaNs
+            0.
+        }
+
+        let sign = delta.map(sign);
+        let near_time = (self.center() - sign * (self.half_extents() + padding) - pos) / delta;
+        let far_time = (self.center() + sign * (self.half_extents() + padding) - pos) / delta;
+
+        if (near_time.x > far_time.y) || (near_time.y > far_time.x) {
+            return None;
+        }
+
+        let normal = if near_time.x > near_time.y {
+            Vec2::new(-sign.x, 0.)
+        } else {
+            Vec2::new(0., -sign.y)
+        };
+
+        let near_time: f32 = near_time.component_max();
+        let far_time: f32 = far_time.component_min();
+
+        if (near_time >= 1.) || (far_time <= 0.) {
+            return None;
+        }
+
+        Some(HitInfo {
+            pos: pos + near_time * delta,
+            normal,
+            time: near_time,
+        })
+    }
+
     pub fn intersects_with_aabb(&self, aabb: &Self) -> bool {
-        let overlaps_x =
-        // Left corners
-        (aabb.min.x <= self.min.x && self.min.x <= aabb.max.x) ||
+        let d = aabb.center() - self.center();
+        let p = (aabb.half_extents() + self.half_extents()) - d.abs();
 
-        // Right corners
-        (aabb.min.x <= self.max.x && self.max.x <= aabb.max.x);
+        !(p.x <= 0. || p.y <= 0.)
+    }
 
-        let overlaps_y =
-        // Bottom corners
-        (aabb.min.y <= self.min.y && self.min.y <= aabb.max.y) ||
+    pub fn intersects_with_aabb_sweep(&self, aabb: &Self, sweep: Vec2) -> Option<f32> {
+        // For small enough sweeps, we know they won't collide and can skip the sweep
+        if sweep.as_array() == &[0., 0.] {
+            // let intersects = self.intersects_with_aabb(aabb);
+            // let time = if intersects { 0. } else { 1. };
 
-        // Top corners
-        (aabb.min.y <= self.max.y && self.max.y <= aabb.max.y);
+            // return Some(HitInfo {
+            //     pos: aabb.center(),
+            //     time,
+            // });
+        }
 
-        overlaps_x && overlaps_y
+        self.intersects_with_line(aabb.center(), sweep, Some(aabb.half_extents()))
+            .map(|hit| hit.time)
     }
 }
 

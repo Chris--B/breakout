@@ -20,6 +20,7 @@ legion = { version ="0.4", default-features = false }
 
 # Math
 ultraviolet = { version = "0.9", features = [ "bytemuck", "f64", "int"] }
+rand = "0.8"
 
 # Misc
 static_assertions = "1.1"

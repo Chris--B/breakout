@@ -1,5 +1,5 @@
-// It's a fresh project and this isn't helpful
-#![allow(dead_code)]
+#![allow(dead_code)] // It's a fresh project and this isn't helpful
+#![allow(mixed_script_confusables)] // Hell yeah, math!
 
 use fermium::prelude::*;
 use legion::*;
@@ -63,6 +63,16 @@ impl Aabb {
 
         overlaps_x && overlaps_y
     }
+}
+
+fn random_direction() -> Vec2 {
+    use rand::prelude::*;
+
+    // Random angle from (0, π) - this is the hemisphere facing up in the simulation
+    let t: f32 = rand::thread_rng().gen();
+    let θ: f32 = std::f32::consts::PI * t;
+
+    Vec2::new(f32::cos(θ), f32::sin(θ))
 }
 
 fn main() {
@@ -170,11 +180,11 @@ fn main() {
                     }
 
                     // Spawn a ball when "B" is pressed
-                    if (type_ == SDL_KEYDOWN) && (key.repeat == 0) && (key.keysym.sym == SDLK_b) {
+                    if (type_ == SDL_KEYDOWN) && (key.keysym.sym == SDLK_b) {
                         let _ball = world.push((
                             Name(format!("Ball-#{ball_count}")),
                             Position(ball_pos),
-                            Velocity(Vec2::new(100., 35.)),
+                            Velocity(135. * random_direction()),
                             HitableQuad { dims: ball_dims },
                             DrawableColoredQuad {
                                 dims: ball_dims,

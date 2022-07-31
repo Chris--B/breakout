@@ -32,6 +32,21 @@ pub mod color {
     pub const OHNO_PINK: Vec3 = Vec3::new(1., 0., 1.);
 }
 
+#[derive(Copy, Clone, Debug)]
+struct Aabb {
+    min: Vec2,
+    max: Vec2,
+}
+
+impl Aabb {
+    pub fn new_from_quad(pos: Vec2, dims: Vec2) -> Self {
+        let min = Vec2::min_by_component(pos, pos + dims);
+        let max = Vec2::max_by_component(pos, pos + dims);
+
+        Self { min, max }
+    }
+}
+
 fn main() {
     let window_width: i32 = 500;
     let window_height: i32 = 750;
@@ -184,8 +199,7 @@ fn main() {
                     let mut needs_bounce = vec![];
 
                     for (ball, Position(ball_pos), ball_quad) in ball_query.iter(&world) {
-                        let ball_aabb_min = ball_pos.min_by_component(*ball_pos + ball_quad.dims);
-                        let ball_aabb_max = ball_pos.max_by_component(*ball_pos + ball_quad.dims);
+                        let ball_aabb = Aabb::new_from_quad(*ball_pos, ball_quad.dims);
 
                         let mut bounce_x_dir = false;
                         let mut bounce_y_dir = false;
@@ -194,22 +208,21 @@ fn main() {
                             hitable_query.iter(&world)
                         {
                             // Broken collides math: Expects the ball to be smaller than what its hitting.
-                            let aabb_min = pos.min_by_component(*pos + quad.dims);
-                            let aabb_max = pos.max_by_component(*pos + quad.dims);
+                            let e_aabb = Aabb::new_from_quad(*pos, quad.dims);
 
                             let overlaps_x =
                                 // Left corners
-                                (aabb_min.x <= ball_aabb_min.x && ball_aabb_min.x <= aabb_max.x) ||
+                                (e_aabb.min.x <= ball_aabb.min.x && ball_aabb.min.x <= e_aabb.max.x) ||
 
                                 // Right corners
-                                (aabb_min.x <= ball_aabb_max.x && ball_aabb_max.x <= aabb_max.x);
+                                (e_aabb.min.x <= ball_aabb.max.x && ball_aabb.max.x <= e_aabb.max.x);
 
                             let overlaps_y =
                                 // Bottom corners
-                                (aabb_min.y <= ball_aabb_min.y && ball_aabb_min.y <= aabb_max.y) ||
+                                (e_aabb.min.y <= ball_aabb.min.y && ball_aabb.min.y <= e_aabb.max.y) ||
 
                                 // Top corners
-                                (aabb_min.y <= ball_aabb_max.y && ball_aabb_max.y <= aabb_max.y);
+                                (e_aabb.min.y <= ball_aabb.max.y && ball_aabb.max.y <= e_aabb.max.y);
 
                             let collides = overlaps_x && overlaps_y;
 

@@ -45,6 +45,24 @@ impl Aabb {
 
         Self { min, max }
     }
+
+    pub fn intersects_with_aabb(&self, aabb: &Self) -> bool {
+        let overlaps_x =
+        // Left corners
+        (aabb.min.x <= self.min.x && self.min.x <= aabb.max.x) ||
+
+        // Right corners
+        (aabb.min.x <= self.max.x && self.max.x <= aabb.max.x);
+
+        let overlaps_y =
+        // Bottom corners
+        (aabb.min.y <= self.min.y && self.min.y <= aabb.max.y) ||
+
+        // Top corners
+        (aabb.min.y <= self.max.y && self.max.y <= aabb.max.y);
+
+        overlaps_x && overlaps_y
+    }
 }
 
 fn main() {
@@ -210,26 +228,10 @@ fn main() {
                             // Broken collides math: Expects the ball to be smaller than what its hitting.
                             let e_aabb = Aabb::new_from_quad(*pos, quad.dims);
 
-                            let overlaps_x =
-                                // Left corners
-                                (e_aabb.min.x <= ball_aabb.min.x && ball_aabb.min.x <= e_aabb.max.x) ||
-
-                                // Right corners
-                                (e_aabb.min.x <= ball_aabb.max.x && ball_aabb.max.x <= e_aabb.max.x);
-
-                            let overlaps_y =
-                                // Bottom corners
-                                (e_aabb.min.y <= ball_aabb.min.y && ball_aabb.min.y <= e_aabb.max.y) ||
-
-                                // Top corners
-                                (e_aabb.min.y <= ball_aabb.max.y && ball_aabb.max.y <= e_aabb.max.y);
-
-                            let collides = overlaps_x && overlaps_y;
-
-                            if collides {
-                                // Note: X & Y here cross map
-                                bounce_x_dir = overlaps_y;
-                                bounce_y_dir = overlaps_x;
+                            if ball_aabb.intersects_with_aabb(&e_aabb) {
+                                // Hardcoded until I fix the math
+                                bounce_x_dir = true;
+                                bounce_y_dir = false;
 
                                 if maybe_breakable.is_some() {
                                     breakables_hit.push(*hitter);

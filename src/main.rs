@@ -176,54 +176,51 @@ fn main() {
         let dt = (DELAY_MS as f32) * 1e-3;
 
         if !paused {
+            // Update ball positions
             {
-                // Update ball positions
-                {
-                    let mut query = <(&mut Position, &Velocity)>::query();
-                    for (Position(pos), Velocity(vel)) in query.iter_mut(&mut world) {
-                        (*pos) += dt * *vel;
-                    }
+                let mut query = <(&mut Position, &Velocity)>::query();
+                for (Position(pos), Velocity(vel)) in query.iter_mut(&mut world) {
+                    (*pos) += dt * *vel;
                 }
+            }
 
-                // Check if the ball is colliding with anything
-                // Note: Balls do not interact with other balls
+            // Check if the ball is colliding with anything
+            // Note: Balls do not interact with other balls
+            {
+                let mut ball_query = <(Entity, &Position, &Velocity, &HitableQuad)>::query()
+                    .filter(component::<Ball>());
+                let mut hitable_query =
+                    <(Entity, &Position, &HitableQuad, Option<&Breakable>)>::query()
+                        .filter(!component::<Ball>());
+
+                let mut breakables_hit = vec![];
+
+                for (_ball, Position(ball_pos), Velocity(ball_vel), ball_quad) in
+                    ball_query.iter(&world)
                 {
-                    let mut ball_query = <(Entity, &Position, &Velocity, &HitableQuad)>::query()
-                        .filter(component::<Ball>());
-                    let mut hitable_query =
-                        <(Entity, &Position, &HitableQuad, Option<&Breakable>)>::query()
-                            .filter(!component::<Ball>());
+                    let ball_aabb = Aabb::new_from_quad(*ball_pos, ball_quad.dims);
 
-                    let mut breakables_hit = vec![];
-
-                    for (_ball, Position(ball_pos), Velocity(ball_vel), ball_quad) in
-                        ball_query.iter(&world)
+                    for (hitter, Position(pos), quad, maybe_breakable) in hitable_query.iter(&world)
                     {
-                        let ball_aabb = Aabb::new_from_quad(*ball_pos, ball_quad.dims);
+                        let aabb = Aabb::new_from_quad(*pos, quad.dims);
 
-                        for (hitter, Position(pos), quad, maybe_breakable) in
-                            hitable_query.iter(&world)
+                        if let Some(_hit) =
+                            ball_aabb.intersects_with_aabb_sweep(&aabb, dt * *ball_vel)
                         {
-                            let aabb = Aabb::new_from_quad(*pos, quad.dims);
-
-                            if let Some(_hit) =
-                                ball_aabb.intersects_with_aabb_sweep(&aabb, dt * *ball_vel)
-                            {
-                                if maybe_breakable.is_some() {
-                                    breakables_hit.push(*hitter);
-                                }
+                            if maybe_breakable.is_some() {
+                                breakables_hit.push(*hitter);
                             }
                         }
                     }
-
-                    // Remove anything that broke
-                    for breakable in breakables_hit {
-                        world.remove(breakable);
-                    }
-
-                    // Adjust position & velocity after the bounce
-                    // TODO
                 }
+
+                // Remove anything that broke
+                for breakable in breakables_hit {
+                    world.remove(breakable);
+                }
+
+                // Adjust position & velocity after the bounce
+                // TODO
             }
         }
 

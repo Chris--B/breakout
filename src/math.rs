@@ -119,20 +119,7 @@ impl Aabb {
     }
 
     pub fn intersects_with_aabb_sweep(&self, aabb: &Self, sweep: Vec2) -> Option<HitInfo> {
-        // For small enough sweeps, we know they won't collide and can skip the sweep
-        if sweep.as_array() == &[0., 0.] {
-            // if self.intersects_with_aabb(aabb) {
-            //     let normal = (aabb.center() - self.center()).normalized();
-            //     return Some(HitInfo {
-            //         pos: self.center(),
-            //         normal,
-            //         time: 0.,
-            //     });
-            // }
-
-            return None;
-        }
-
+        // To perform a sweep, we'll pad out the other box with our half extents, and use a line test
         self.intersects_with_line(aabb.center(), sweep, Some(aabb.half_extents()))
     }
 }

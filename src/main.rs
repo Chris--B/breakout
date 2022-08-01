@@ -188,60 +188,41 @@ fn main() {
                 // Check if the ball is colliding with anything
                 // Note: Balls do not interact with other balls
                 {
-                    let mut ball_query =
-                        <(Entity, &Position, &HitableQuad)>::query().filter(component::<Ball>());
+                    let mut ball_query = <(Entity, &Position, &Velocity, &HitableQuad)>::query()
+                        .filter(component::<Ball>());
                     let mut hitable_query =
                         <(Entity, &Position, &HitableQuad, Option<&Breakable>)>::query()
                             .filter(!component::<Ball>());
 
                     let mut breakables_hit = vec![];
-                    let mut needs_bounce = vec![];
 
-                    for (ball, Position(ball_pos), ball_quad) in ball_query.iter(&world) {
+                    for (_ball, Position(ball_pos), Velocity(ball_vel), ball_quad) in
+                        ball_query.iter(&world)
+                    {
                         let ball_aabb = Aabb::new_from_quad(*ball_pos, ball_quad.dims);
-
-                        let mut bounce_x_dir = false;
-                        let mut bounce_y_dir = false;
 
                         for (hitter, Position(pos), quad, maybe_breakable) in
                             hitable_query.iter(&world)
                         {
-                            // Broken collides math: Expects the ball to be smaller than what its hitting.
-                            let e_aabb = Aabb::new_from_quad(*pos, quad.dims);
+                            let aabb = Aabb::new_from_quad(*pos, quad.dims);
 
-                            if ball_aabb.intersects_with_aabb(&e_aabb) {
-                                // Hardcoded until I fix the math
-                                bounce_x_dir = true;
-                                bounce_y_dir = false;
-
+                            if let Some(_hit) =
+                                ball_aabb.intersects_with_aabb_sweep(&aabb, dt * *ball_vel)
+                            {
                                 if maybe_breakable.is_some() {
                                     breakables_hit.push(*hitter);
                                 }
                             }
                         }
-
-                        if bounce_x_dir || bounce_y_dir {
-                            needs_bounce.push((*ball, bounce_x_dir, bounce_y_dir));
-                        }
                     }
 
+                    // Remove anything that broke
                     for breakable in breakables_hit {
                         world.remove(breakable);
                     }
 
-                    for (ball, bounce_x_dir, bounce_y_dir) in needs_bounce {
-                        if let Ok(Velocity(vel)) =
-                            world.entry(ball).unwrap().get_component_mut::<Velocity>()
-                        {
-                            if bounce_x_dir {
-                                vel.x *= -1.
-                            }
-
-                            if bounce_y_dir {
-                                vel.y *= -1.
-                            }
-                        }
-                    }
+                    // Adjust position & velocity after the bounce
+                    // TODO
                 }
             }
         }

@@ -5,6 +5,8 @@ use fermium::prelude::*;
 use legion::*;
 use ultraviolet::{Vec2, Vec3};
 
+use std::collections::HashMap;
+
 mod ecs;
 mod gfx;
 mod math;
@@ -176,14 +178,6 @@ fn main() {
         let dt = (DELAY_MS as f32) * 1e-3;
 
         if !paused {
-            // Update ball positions
-            {
-                let mut query = <(&mut Position, &Velocity)>::query();
-                for (Position(pos), Velocity(vel)) in query.iter_mut(&mut world) {
-                    (*pos) += dt * *vel;
-                }
-            }
-
             // Check if the ball is colliding with anything
             // Note: Balls do not interact with other balls
             {
@@ -194,8 +188,9 @@ fn main() {
                         .filter(!component::<Ball>());
 
                 let mut breakables_hit = vec![];
+                let mut bounces = HashMap::new();
 
-                for (_ball, Position(ball_pos), Velocity(ball_vel), ball_quad) in
+                for (ball, Position(ball_pos), Velocity(ball_vel), ball_quad) in
                     ball_query.iter(&world)
                 {
                     let ball_aabb = Aabb::new_from_quad(*ball_pos, ball_quad.dims);
@@ -204,12 +199,14 @@ fn main() {
                     {
                         let aabb = Aabb::new_from_quad(*pos, quad.dims);
 
-                        if let Some(_hit) =
+                        if let Some(hit) =
                             ball_aabb.intersects_with_aabb_sweep(&aabb, dt * *ball_vel)
                         {
                             if maybe_breakable.is_some() {
                                 breakables_hit.push(*hitter);
                             }
+
+                            bounces.insert(*ball, hit);
                         }
                     }
                 }
@@ -219,8 +216,16 @@ fn main() {
                     world.remove(breakable);
                 }
 
-                // Adjust position & velocity after the bounce
-                // TODO
+                // Update ball positions w/ velocity & bounces
+                let mut query = <(Entity, &mut Position, &mut Velocity)>::query();
+                for (e, Position(pos), Velocity(vel)) in query.iter_mut(&mut world) {
+                    if let Some(hit) = bounces.get(e) {
+                        //
+                    } else {
+                        // Common case: nothing bounces
+                        *pos += dt * *vel;
+                    }
+                }
             }
         }
 

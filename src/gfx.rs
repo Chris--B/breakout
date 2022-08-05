@@ -173,6 +173,19 @@ pub fn print_device_info(device: &DeviceRef) {
     println!("    raytracing?                     {}", b);
 
     println!();
+
+    unsafe {
+        extern "C" {
+            fn os_proc_available_memory() -> usize;
+        }
+
+        let bytes = os_proc_available_memory();
+        if bytes == 0 {
+            println!("    os_proc_available_memory()      No limit");
+        } else {
+            println!("    os_proc_available_memory()      {bytes} bytes");
+        }
+    }
 }
 
 /// Returns true when there is not error. Think:

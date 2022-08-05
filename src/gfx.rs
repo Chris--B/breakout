@@ -136,15 +136,24 @@ pub fn print_device_info(device: &DeviceRef) {
         MTLGPUFamily::Apple7,
         MTLGPUFamily::Apple8,
         MTLGPUFamily::Apple9,
+
+        MTLGPUFamily::Mac2,
+
+        MTLGPUFamily::Common1,
+        MTLGPUFamily::Common2,
+        MTLGPUFamily::Common3,
     ];
 
-    let family = FAMILIES
+    if let Some(family) = FAMILIES
         .iter()
         .copied()
         .rev()
         .find(|family| device.supports_family(*family))
-        .unwrap();
-    println!("    supported family: {family:?}");
+    {
+        println!("    supported family: {family:?}");
+    } else {
+        println!("    supported family: 🤷‍♀️");
+    }
 
     println!("    supported  texture sample count:");
     for count in 1.. {

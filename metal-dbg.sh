@@ -1,0 +1,7 @@
+#!/bin/bash
+
+export METAL_DEVICE_WRAPPER_TYPE=1
+export METAL_ERROR_MODE=5 
+export METAL_DEBUG_ERROR_MODE=5
+
+$@

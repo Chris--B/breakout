@@ -127,6 +127,12 @@ pub fn print_device_info(device: &DeviceRef) {
 
     #[rustfmt::skip]
     const FAMILIES: &[MTLGPUFamily] = &[
+        MTLGPUFamily::Common1,
+        MTLGPUFamily::Common2,
+        MTLGPUFamily::Common3,
+
+        MTLGPUFamily::Mac2,
+
         MTLGPUFamily::Apple1,
         MTLGPUFamily::Apple2,
         MTLGPUFamily::Apple3,
@@ -136,12 +142,6 @@ pub fn print_device_info(device: &DeviceRef) {
         MTLGPUFamily::Apple7,
         MTLGPUFamily::Apple8,
         MTLGPUFamily::Apple9,
-
-        MTLGPUFamily::Mac2,
-
-        MTLGPUFamily::Common1,
-        MTLGPUFamily::Common2,
-        MTLGPUFamily::Common3,
     ];
 
     if let Some(family) = FAMILIES

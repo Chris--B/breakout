@@ -168,8 +168,7 @@ checksum = "3f107b87b6afc2a64fd13cac55fe06d6c8859f12d4b14cbcdd2c67d0976781be"
 [[package]]
 name = "fermium"
 version = "20022.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb3c99e269aa9b2836ab05cbb2e482d46699fe6d3fa5725ed9af0e2206423dd7"
+source = "git+https://github.com/chris--b/fermium#1a3a9a786119bb69dd646a5c47e3879fa7d8c4ec"
 dependencies = [
  "chlorine",
  "cmake",

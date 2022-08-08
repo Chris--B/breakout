@@ -142,7 +142,7 @@ pub fn app_main() {
 
                     // Spawn a ball when "B" is pressed
                     if (type_ == SDL_KEYDOWN) && (key.keysym.sym == SDLK_b) {
-                        let _ball = world.push((
+                        world.push((
                             Name(format!("Ball-#{ball_count}")),
                             Position(ball_pos),
                             Velocity(135. * random_direction()),
@@ -153,6 +153,7 @@ pub fn app_main() {
                             },
                             Ball,
                         ));
+                        ball_count += 1;
                     }
 
                     // Clear all balls when "C" is pressed
@@ -166,6 +167,24 @@ pub fn app_main() {
 
                         println!("Removed {ball_count} balls");
                     }
+                }
+
+                // On tap or drag, spawn a ball!
+                SDL_FINGERDOWN | SDL_FINGERMOTION => {
+                    let _tfinger: SDL_TouchFingerEvent = unsafe { e.tfinger };
+
+                    world.push((
+                        Name(format!("Ball-#{ball_count}")),
+                        Position(ball_pos),
+                        Velocity(135. * random_direction()),
+                        HitableQuad { dims: ball_dims },
+                        DrawableColoredQuad {
+                            dims: ball_dims,
+                            color: color::WHITE,
+                        },
+                        Ball,
+                    ));
+                    ball_count += 1;
                 }
 
                 // Ignore all other events

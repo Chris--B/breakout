@@ -2,4 +2,4 @@
 .cargo/
 *.metallib*
 
-*.xcodeproj/
+breakout-ios/

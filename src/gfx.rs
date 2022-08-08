@@ -85,32 +85,38 @@ pub fn print_device_info(device: &DeviceRef) {
     println!("MTL Device Info");
     println!("    class                   = {}", class_name(device));
     println!("    registry_id             = 0x{:x}", device.registry_id());
-    println!("    location                = {:?}", device.location());
-    println!("    location_number         = {}", device.location_number());
+    if cfg!(target_os = "macos") {
+        println!("    location                = {:?}", device.location());
+        println!("    location_number         = {}", device.location_number());
+    }
     println!();
 
-    println!(
-        "    is_low_power            = {}",
-        check_or_x(device.is_low_power())
-    );
-    println!(
-        "    is_headless             = {}",
-        check_or_x(device.is_headless())
-    );
-    println!(
-        "    is_removable            = {}",
-        check_or_x(device.is_removable())
-    );
-    println!(
-        "    has_unified_memory      = {}",
-        check_or_x(device.has_unified_memory())
-    );
-    println!();
+    if cfg!(target_os = "macos") {
+        println!(
+            "    is_low_power            = {}",
+            check_or_x(device.is_low_power())
+        );
+        println!(
+            "    is_headless             = {}",
+            check_or_x(device.is_headless())
+        );
+        println!(
+            "    is_removable            = {}",
+            check_or_x(device.is_removable())
+        );
+        println!(
+            "    has_unified_memory      = {}",
+            check_or_x(device.has_unified_memory())
+        );
+        println!();
+    }
 
-    println!(
-        "    max_transfer_rate                = {}",
-        device.max_transfer_rate()
-    );
+    if cfg!(target_os = "macos") {
+        println!(
+            "    max_transfer_rate                = {}",
+            device.max_transfer_rate()
+        );
+    }
     println!(
         "    max_threadgroup_memory_length    = {:?}",
         device.max_threadgroup_memory_length()

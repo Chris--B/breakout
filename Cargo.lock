@@ -168,7 +168,7 @@ checksum = "3f107b87b6afc2a64fd13cac55fe06d6c8859f12d4b14cbcdd2c67d0976781be"
 [[package]]
 name = "fermium"
 version = "20022.0.0"
-source = "git+https://github.com/chris--b/fermium#4709b46a70bd82bf6dc94310c48f4af6a738e397"
+source = "git+https://github.com/chris--b/fermium#bed84de41cdc7633a30452df07643f9f0acfd566"
 dependencies = [
  "chlorine",
  "cmake",

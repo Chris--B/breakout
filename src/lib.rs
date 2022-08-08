@@ -23,7 +23,7 @@ fn poll_event() -> Option<SDL_Event> {
     }
 }
 
-pub mod color {
+mod color {
     use super::*;
 
     pub const WHITE: Vec3 = Vec3::new(0.84, 0.84, 0.84);
@@ -36,7 +36,7 @@ pub mod color {
     pub const OHNO_PINK: Vec3 = Vec3::new(1., 0., 1.);
 }
 
-fn main() {
+pub fn app_main() {
     let window_width: i32 = 500;
     let window_height: i32 = 750;
 

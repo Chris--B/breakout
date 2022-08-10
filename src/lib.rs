@@ -62,7 +62,7 @@ pub fn app_main() {
             _ => color::OHNO_PINK,
         };
         for x in 0..14 {
-            // Note: Our x coordinate here must match the calculation for view_x above
+            // Note: Our x coordinate here must match the calculation© for view_x above
             let pos_x = (dims.x + 1.) * (x as f32) + 1.;
             let pos_y = view_y - (dims.y + 1.) * (y as f32 + 1.);
             let pos = Vec2::new(pos_x, pos_y);
@@ -238,7 +238,7 @@ pub fn app_main() {
                 // Update ball positions w/ velocity & bounces
                 let mut query = <(Entity, &mut Position, &mut Velocity)>::query();
                 for (e, Position(pos), Velocity(vel)) in query.iter_mut(&mut world) {
-                    if let Some(hit) = bounces.get(e) {
+                    if let Some(_hit) = bounces.get(e) {
                         //
                     } else {
                         // Common case: nothing bounces

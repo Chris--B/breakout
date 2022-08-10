@@ -204,7 +204,7 @@ pub fn print_device_info(device: &DeviceRef) {
 }
 
 /// Returns true when there is not error. Think:
-/// ```rust
+/// ```rust,ignore
 /// let ok = check_sdl_error("SDL_Foo");
 /// ```
 fn check_sdl_error(func: &str) -> bool {

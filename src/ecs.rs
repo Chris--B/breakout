@@ -15,13 +15,21 @@ pub struct HitableQuad {
 }
 
 #[derive(Copy, Clone, Debug)]
+pub struct HitableBall {
+    pub radius: f32,
+}
+
+#[derive(Copy, Clone, Debug)]
 pub struct DrawableColoredQuad {
     pub dims: Vec2,
     pub color: Vec3,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct Ball;
+pub struct DrawableColoredBall {
+    pub radius: f32,
+    pub color: Vec3,
+}
 
 #[derive(Copy, Clone, Debug)]
 pub struct Paddle;

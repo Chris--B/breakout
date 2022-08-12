@@ -83,6 +83,7 @@ fn class_name<C: objc::Message>(obj: &C) -> String {
 
 pub fn print_device_info(device: &DeviceRef) {
     println!("MTL Device Info");
+    println!("    name                    = {}", device.name());
     println!("    class                   = {}", class_name(device));
     println!("    registry_id             = 0x{:x}", device.registry_id());
     if cfg!(target_os = "macos") {

@@ -1,7 +1,15 @@
 use ultraviolet::{Vec2, Vec3};
 
+use std::fmt;
+
 #[derive(Clone, Debug)]
 pub struct Name(pub String);
+
+impl fmt::Display for Name {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&*self.0)
+    }
+}
 
 #[derive(Copy, Clone, Debug)]
 pub struct Position(pub Vec2);
@@ -36,3 +44,6 @@ pub struct Paddle;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Breakable;
+
+#[derive(Copy, Clone, Debug)]
+pub struct Bounce(pub Vec2);

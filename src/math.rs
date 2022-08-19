@@ -124,7 +124,7 @@ impl Aabb {
     }
 }
 
-fn sign(x: f32) -> f32 {
+pub fn sign(x: f32) -> f32 {
     if x < 0. {
         return -1.;
     }

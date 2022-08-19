@@ -1,5 +1,6 @@
 #![allow(dead_code)] // It's a fresh project and this isn't helpful
 #![allow(mixed_script_confusables)] // Hell yeah, math!
+#![allow(clippy::nonminimal_bool)] // The compiler can reduce this, let me write it for humans
 
 use fermium::prelude::*;
 use legion::*;
@@ -164,7 +165,9 @@ pub fn app_main() {
 
                         BALL_COUNT.store(0, SeqCst);
 
-                        println!("Removed {ball_count} balls");
+                        if ball_count > 0 {
+                            println!("Removed {ball_count} balls");
+                        }
                     }
                 }
 
@@ -186,27 +189,110 @@ pub fn app_main() {
 
         // Advance the simulation
         if !paused {
+            let mut out_of_bounds: Vec<Entity> = vec![];
+
             // Advance anything with velocity
-            let mut query = <(&mut Position, &mut Velocity)>::query();
-            for (Position(pos), Velocity(vel)) in query.iter_mut(&mut world) {
+            let mut query = <(Entity, &mut Position, &mut Velocity)>::query();
+            for (entity, Position(pos), Velocity(vel)) in query.iter_mut(&mut world) {
                 *pos += dt * *vel;
+
+                if !(0. < pos.x && pos.x < view_x) || !(0. < pos.y && pos.y < view_y) {
+                    out_of_bounds.push(*entity);
+                }
             }
 
-            let mut ball_query = <(Entity, &Position, &Velocity, &HitableBall)>::query();
-            let mut _bricks_query =
-                <(Entity, &Position, &HitableQuad, Option<&Breakable>)>::query();
+            // Check if any of the balls hit a brick
+            let mut ball_query = <(Entity, &Position, &HitableBall)>::query();
+            let mut bricks_query = <(Entity, &Position, &HitableQuad, Option<&Breakable>)>::query();
 
-            let breakables_hit = vec![];
+            let mut needs_to_break: Vec<Entity> = vec![];
+            let mut needs_to_bounce: Vec<(Entity, Bounce)> = vec![];
 
-            for (_ball, Position(_ball_pos), Velocity(_ball_vel), HitableBall { radius: _ }) in
-                ball_query.iter(&world)
-            {
-                // TODO: Ball-AABB intersectionb
+            for (ball, Position(ball_pos), HitableBall { radius }) in ball_query.iter(&world) {
+                let radius_sq = radius * radius;
+
+                for (brick, Position(brick_pos), hitable, maybe_breakable) in
+                    bricks_query.iter(&world)
+                {
+                    let aabb = Aabb::new_from_quad(*brick_pos, hitable.dims);
+                    let center = aabb.center();
+                    let extents = aabb.half_extents();
+
+                    let dist_clamped = (*ball_pos - center).clamped(-extents, extents);
+                    let closest_on_or_in_aabb = center + dist_clamped;
+
+                    if (closest_on_or_in_aabb - *ball_pos).mag_sq() < radius_sq {
+                        if maybe_breakable.is_some() {
+                            needs_to_break.push(*brick);
+                        }
+
+                        let x_delta;
+                        let y_delta;
+
+                        if ball_pos.x <= aabb.min.x {
+                            x_delta = ball_pos.x - aabb.min.x;
+                        } else if ball_pos.x >= aabb.max.x {
+                            x_delta = ball_pos.x - aabb.max.x;
+                        } else {
+                            x_delta = *radius;
+                        }
+
+                        if ball_pos.y <= aabb.min.y {
+                            y_delta = ball_pos.y - aabb.min.y;
+                        } else if ball_pos.y >= aabb.max.y {
+                            y_delta = ball_pos.y - aabb.max.y;
+                        } else {
+                            y_delta = *radius;
+                        }
+
+                        let normal = if x_delta.abs() < y_delta.abs() {
+                            Vec2::new(sign(x_delta), 0.)
+                        } else if y_delta.abs() < x_delta.abs() {
+                            Vec2::new(0., sign(y_delta))
+                        } else {
+                            Vec2::new(-1., -1.).normalized()
+                        };
+
+                        needs_to_bounce.push((*ball, Bounce(normal)));
+                    }
+                }
             }
 
             // Remove anything that broke
-            for breakable in breakables_hit {
+            for breakable in needs_to_break {
                 world.remove(breakable);
+            }
+
+            // Bounce anything that needs to bounce
+            {
+                // TODO: This can't be the best way to do this...
+                // Add component to track bounces
+                for (entity, bounce) in &needs_to_bounce {
+                    let mut entry = world.entry(*entity).unwrap();
+                    entry.add_component(*bounce);
+                }
+
+                // Update velocity for anything with our Bounce component
+                let mut bounce_query = <(&mut Velocity, &Bounce)>::query();
+                for (Velocity(vel), Bounce(bounce)) in bounce_query.iter_mut(&mut world) {
+                    *vel = vel.reflected(*bounce);
+                }
+
+                // Remove the bounce components
+                for (entity, _bounce) in needs_to_bounce {
+                    let mut entry = world.entry(entity).unwrap();
+                    entry.remove_component::<Bounce>();
+                }
+            }
+
+            // Remove anything out of bounds
+            for entity in out_of_bounds {
+                // let entry = world.entry(entity).unwrap();
+                // if let Ok(name) = entry.get_component::<Name>() {
+                //     println!("Removing out of bounds entity \"{name}\"");
+                // }
+
+                world.remove(entity);
             }
         }
 

@@ -54,6 +54,7 @@ checksum = "0d8c1fef690941d3e7788d328517591fecc684c084084702d6ff1641e993699a"
 name = "breakout"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "cstr",
  "fermium",
  "foreign-types-shared",
@@ -68,9 +69,9 @@ dependencies = [
 
 [[package]]
 name = "bytemuck"
-version = "1.11.0"
+version = "1.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5377c8865e74a160d21f29c2d40669f53286db6eab59b88540cbb12ffc8b835"
+checksum = "2f5715e491b5a1598fc2bef5a606847b5dc1d48ea625bd3c02c00de8285591da"
 
 [[package]]
 name = "cc"

@@ -28,6 +28,7 @@ rand = "0.8"
 # Misc
 static_assertions = "1.1"
 pretty_assertions = "1.2"
+bytemuck = "1.12"
 
 # Enable minimal optimizations for our debug code
 [profile.dev]

@@ -81,7 +81,7 @@ fn class_name<C: objc::Message>(obj: &C) -> String {
     }
 }
 
-pub fn print_device_info(device: &DeviceRef) {
+fn print_device_info(device: &DeviceRef) {
     println!("MTL Device Info");
     println!("    name                    = {}", device.name());
     println!("    class                   = {}", class_name(device));
@@ -202,9 +202,210 @@ pub fn print_device_info(device: &DeviceRef) {
             println!("    os_proc_available_memory()      {bytes} bytes");
         }
     }
+
+    println!();
+}
+fn sysctl<T: bytemuck::Pod>(name: impl std::ops::Deref<Target = str>) -> T {
+    let name = name.deref();
+    use std::mem;
+    use std::ptr;
+
+    extern "C" {
+        fn sysctlbyname(
+            name: *const c_char,
+            oldp: *mut c_void,
+            oldlenp: *mut usize,
+            newp: *mut c_void,
+            newlen: *mut usize,
+        ) -> c_int;
+    }
+
+    // No name should be this long, so guard against it.
+    let input_len = name.as_bytes().len();
+    const CSTR_LEN: usize = 32;
+    assert!(
+        input_len < CSTR_LEN,
+        "\"{name}\" has length of {input_len}, which is too long for our buffer of {CSTR_LEN}"
+    );
+    let copy_len = usize::min(CSTR_LEN, input_len);
+
+    let mut name_buf = [0 as c_char; CSTR_LEN];
+    unsafe {
+        // Copy to the stack where we can NUL terminate
+        ptr::copy_nonoverlapping(
+            name.as_bytes().as_ptr() as *mut c_char,
+            &mut name_buf[0],
+            copy_len,
+        );
+
+        // Query size of the data and assert that it matches our T
+        let mut len = 0;
+        let ret = sysctlbyname(
+            name_buf.as_ptr(),
+            ptr::null_mut(),
+            &mut len,
+            ptr::null_mut(),
+            ptr::null_mut(),
+        );
+        if ret != 0 {
+            // TODO: Handle failures more gracefully than panicing
+            panic!("sysctlbyname(\"{name}\") returned {ret} when querying length");
+        }
+
+        // assert_eq!(len, mem::size_of::<T>(), "Actual byte-length of \"{name}\" is {len}, but we thought it was {t_len} (from sizeof({t_name}))",
+        //     t_name=std::any::type_name::<T>(), t_len=mem::size_of::<T>());
+
+        let mut bytes = mem::MaybeUninit::<T>::uninit();
+        let ret = sysctlbyname(
+            name_buf.as_ptr(),
+            bytes.as_mut_ptr() as *mut c_void,
+            &mut len,
+            ptr::null_mut(),
+            ptr::null_mut(),
+        );
+        if ret != 0 {
+            // TODO: Handle failures more gracefully than panicing
+            panic!("sysctlbyname(\"{name}\") returned {ret} when querying value");
+        }
+
+        bytes.assume_init()
+    }
 }
 
-/// Returns true when there is not error. Think:
+#[derive(Copy, Clone)]
+struct InlineString<const SIZE: usize = 32>([u8; SIZE]);
+
+impl<const SIZE: usize> std::fmt::Debug for InlineString<SIZE> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
+impl<const SIZE: usize> std::fmt::Display for InlineString<SIZE> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
+impl<const SIZE: usize> InlineString<SIZE> {
+    const SIZE: usize = SIZE;
+
+    fn as_str(&self) -> &str {
+        std::str::from_utf8(&self.0)
+            .unwrap()
+            .trim_matches(|c| c == '\0')
+    }
+}
+
+unsafe impl<const SIZE: usize> bytemuck::Zeroable for InlineString<SIZE> {}
+unsafe impl<const SIZE: usize> bytemuck::Pod for InlineString<SIZE> {}
+
+// TODO: Check this off of ASi
+fn print_system_info() {
+    #[derive(Copy, Clone, Debug)]
+    struct PerfLevel {
+        name: InlineString,
+        physicalcpu: u32,
+        physicalcpu_max: u32,
+        logicalcpu: u32,
+        logicalcpu_max: u32,
+        l1icachesize: u32,
+        l1dcachesize: u32,
+        l2cachesize: u32,
+        cpusperl2: u32,
+    }
+
+    println!("System Info");
+
+    let nperflevels: u32 = sysctl("hw.nperflevels");
+    let mut perflevels = [None; 2];
+    {
+        if nperflevels > 0 {
+            let name = sysctl("hw.perflevel0.name");
+
+            let physicalcpu = sysctl("hw.perflevel0.physicalcpu");
+            let physicalcpu_max = sysctl("hw.perflevel0.physicalcpu_max");
+            let logicalcpu = sysctl("hw.perflevel0.logicalcpu");
+            let logicalcpu_max = sysctl("hw.perflevel0.logicalcpu_max");
+            let l1icachesize = sysctl("hw.perflevel0.l1icachesize");
+            let l1dcachesize = sysctl("hw.perflevel0.l1dcachesize");
+            let l2cachesize = sysctl("hw.perflevel0.l2cachesize");
+            let cpusperl2 = sysctl("hw.perflevel0.cpusperl2");
+
+            perflevels[0] = Some(PerfLevel {
+                name,
+                physicalcpu,
+                physicalcpu_max,
+                logicalcpu,
+                logicalcpu_max,
+                l1icachesize,
+                l1dcachesize,
+                l2cachesize,
+                cpusperl2,
+            });
+        }
+
+        if nperflevels > 1 {
+            let name = sysctl("hw.perflevel1.name");
+
+            let physicalcpu = sysctl("hw.perflevel1.physicalcpu");
+            let physicalcpu_max = sysctl("hw.perflevel1.physicalcpu_max");
+            let logicalcpu = sysctl("hw.perflevel1.logicalcpu");
+            let logicalcpu_max = sysctl("hw.perflevel1.logicalcpu_max");
+            let l1icachesize = sysctl("hw.perflevel1.l1icachesize");
+            let l1dcachesize = sysctl("hw.perflevel1.l1dcachesize");
+            let l2cachesize = sysctl("hw.perflevel1.l2cachesize");
+            let cpusperl2 = sysctl("hw.perflevel1.cpusperl2");
+
+            perflevels[1] = Some(PerfLevel {
+                name,
+                physicalcpu,
+                physicalcpu_max,
+                logicalcpu,
+                logicalcpu_max,
+                l1icachesize,
+                l1dcachesize,
+                l2cachesize,
+                cpusperl2,
+            });
+        }
+    }
+
+    for pl in perflevels.iter().flatten() {
+        let PerfLevel {
+            name,
+            physicalcpu,
+            physicalcpu_max,
+            logicalcpu,
+            logicalcpu_max,
+            l1icachesize,
+            l1dcachesize,
+            l2cachesize,
+            cpusperl2,
+        } = pl;
+
+        println!("    \"{}\" Cores", name.as_str());
+        println!("        physicalcpu:     {physicalcpu}");
+        println!("        physicalcpu_max: {physicalcpu_max}");
+        println!("        logicalcpu:      {logicalcpu}");
+        println!("        logicalcpu_max:  {logicalcpu_max}");
+        println!("        l1icachesize:    {l1icachesize}");
+        println!("        l1dcachesize:    {l1dcachesize}");
+        println!("        l2cachesize:     {l2cachesize}");
+        println!("        cpusperl2:       {cpusperl2}");
+    }
+
+    let ncpu: u32 = sysctl("hw.ncpu");
+    let pagesize: u64 = sysctl("hw.pagesize");
+    let target: InlineString = sysctl("hw.target");
+
+    println!("    ncpu:     {ncpu}");
+    println!("    pagesize: {pagesize}");
+    println!("    target:   {target}");
+    println!();
+}
+
+/// Returns true when there is no error. Think:
 /// ```rust,ignore
 /// let ok = check_sdl_error("SDL_Foo");
 /// ```
@@ -383,6 +584,7 @@ impl GpuDevice {
         let window = window.clone();
         let device = Device::system_default().unwrap();
         print_device_info(&device);
+        print_system_info();
 
         let metal_layer: MetalLayer = window.get_metal_layer();
         metal_layer.set_device(&device);

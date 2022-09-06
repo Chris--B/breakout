@@ -320,7 +320,7 @@ fn print_system_info() {
     let nperflevels: u32 = sysctl("hw.nperflevels");
     let mut perflevels = [None; 2];
     {
-        if nperflevels > 0 {
+        if nperflevels > 1 {
             let name = sysctl("hw.perflevel0.name");
 
             let physicalcpu = sysctl("hw.perflevel0.physicalcpu");
@@ -343,9 +343,7 @@ fn print_system_info() {
                 l2cachesize,
                 cpusperl2,
             });
-        }
 
-        if nperflevels > 1 {
             let name = sysctl("hw.perflevel1.name");
 
             let physicalcpu = sysctl("hw.perflevel1.physicalcpu");

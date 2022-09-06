@@ -320,6 +320,8 @@ fn print_system_info() {
     let nperflevels: u32 = sysctl("hw.nperflevels");
     let mut perflevels = [None; 2];
     {
+        // On systems with more than 1 "perflevel", there are new keys for each "level".
+        // On systems with exactly 1, see `hw.perflevel.*` instead.
         if nperflevels > 1 {
             let name = sysctl("hw.perflevel0.name");
 

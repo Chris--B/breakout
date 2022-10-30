@@ -10,3 +10,4 @@
 
 # Generated files that we don't check in
 breakout-ios/
+*.gputrace/

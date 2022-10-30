@@ -5,6 +5,9 @@ use objc::*;
 use ultraviolet::projection::lh_yup::orthographic_vk as orthographic;
 use ultraviolet::{Mat4, Vec2, Vec3};
 
+use foreign_types_shared::ForeignTypeRef;
+
+use std::ffi::{CStr, CString};
 use std::os::raw::c_void;
 use std::sync::Arc;
 
@@ -213,7 +216,6 @@ fn check_sdl_error(func: &str) -> bool {
     #![allow(clippy::unnecessary_cast)]
 
     use fermium::prelude::*;
-    use std::ffi::CStr;
 
     unsafe {
         let mut msg_buf = [0 as c_char; 512];
@@ -251,7 +253,6 @@ pub struct WindowImpl {
 impl Window {
     pub fn new(width: i32, height: i32) -> Self {
         use cstr::cstr;
-        use std::ffi::CStr;
 
         unsafe {
             let hint_render_driver: &CStr =
@@ -476,6 +477,8 @@ impl GpuDevice {
             encoder.set_vertex_buffer(shaders::BUFFER_IDX_VIEW, Some(&view_buffer), 0);
             encoder.set_vertex_buffer(shaders::BUFFER_IDX_PER_QUAD, Some(&quads_buffer), 0);
 
+            encoder.set_fragment_buffer(shaders::BUFFER_IDX_PER_QUAD, Some(&quads_buffer), 0);
+
             // 6 vertices per quad
             let tri_count = 6 * quads.len() as u64;
             encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, tri_count);
@@ -491,6 +494,21 @@ impl GpuDevice {
         self.view_width = width;
         self.view_height = height;
     }
+
+    pub fn prepare_capture(&self) -> Option<GpuCaptureManager> {
+        let capture_manager = CaptureManager::shared();
+
+        if !capture_manager.supports_destination(MTLCaptureDestination::GpuTraceDocument) {
+            println!("!!! Capture to a GPU tracefile is not supported !!!");
+            return None;
+        }
+
+        Some(GpuCaptureManager {
+            capture_manager,
+            device: self.device.clone(),
+            tracefile: None,
+        })
+    }
 }
 
 impl Drop for GpuDevice {
@@ -500,5 +518,88 @@ impl Drop for GpuDevice {
         //     SDL_DestroyRenderer(self.p_renderer);
         //     SDL_DestroyWindow(self.p_window);
         // }
+    }
+}
+
+// See: https://alia-traces.github.io/metal/tools/xcode/2020/07/18/adding-framecapture-outside-of-xcode.html
+pub struct GpuCaptureManager<'a> {
+    capture_manager: &'a CaptureManagerRef,
+    device: Device,
+    tracefile: Option<String>,
+}
+
+extern "C" {
+    fn GpuCaptureManager_start(
+        capture_manager: *const MTLCaptureManager,
+        device: *const MTLDevice,
+        trace_url: &CStr,
+    ) -> bool;
+    fn GpuCaptureManager_stop(capture_manager: *const MTLCaptureManager);
+}
+
+impl<'a> GpuCaptureManager<'a> {
+    pub fn start(&mut self) {
+        // Make a unique trace filename in the system temp directory
+        let mut tracefile = std::env::temp_dir();
+        {
+            tracefile.push("breakout");
+            tracefile.push("gputraces");
+
+            if let Err(e) = std::fs::create_dir_all(&tracefile) {
+                println!("!!! Creating temp directory: {}", e);
+            }
+
+            tracefile.push(format!(
+                "breakout-{}.gputrace",
+                chrono::Local::now().format("%Y-%m-%d_%H-%M-%S%.3f")
+            ));
+        }
+        let tracefile = format!("file://{}", tracefile.to_str().unwrap());
+        println!("Starting Gpu capture. Writing to...");
+        println!("    {tracefile}");
+
+        let ok = unsafe {
+            let tracefile_url = CString::new(tracefile.clone()).unwrap();
+
+            GpuCaptureManager_start(
+                self.capture_manager.as_ptr(),
+                self.device.as_ptr(),
+                &tracefile_url,
+            )
+        };
+
+        if ok {
+            use std::process::Command;
+
+            let _ = Command::new("open")
+                .arg(&tracefile)
+                .output()
+                .expect("Failed to open traces dir");
+
+            self.tracefile = Some(tracefile);
+        } else {
+            let msg = ""; // TODO: Get this back from Swift
+            println!("Failed to start a Gpu trace: \"{msg}\"");
+        }
+    }
+
+    pub fn stop(self) {
+        unsafe {
+            GpuCaptureManager_stop(self.capture_manager.as_ptr());
+        }
+        println!("Finished writing Gpu Capture to");
+        println!("    {}", self.tracefile.unwrap_or_default());
+
+        // self.capture_manager.stop_capture();
+
+        // TODO: Open Xcode
+        /*
+            let standardPath = destURL.path
+            let scriptSource = "tell application \"Xcode\"\nopen \"\(standardPath)\"\nend tell"
+            let script = NSAppleScript.init(source: scriptSource)
+            DispatchQueue(label: "XcodeOpen", qos: .utility, attributes: [.concurrent], autoreleaseFrequency: .inherit, target: nil).async {
+                script?.executeAndReturnError(nil)
+            }
+        */
     }
 }

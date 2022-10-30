@@ -18,6 +18,9 @@ cstr = "0.2"
 fermium = { git = "https://github.com/chris--b/fermium" }
 # fermium = { path = "../fermium" }
 
+# Mac-ism
+embed_plist = "1.2"
+
 # ECS
 legion = { version ="0.4", default-features = false }
 
@@ -28,6 +31,7 @@ rand = "0.8"
 # Misc
 static_assertions = "1.1"
 pretty_assertions = "1.2"
+chrono = "0.4"
 
 # Enable minimal optimizations for our debug code
 [profile.dev]

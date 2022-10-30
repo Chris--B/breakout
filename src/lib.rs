@@ -16,6 +16,8 @@ mod math;
 use ecs::*;
 use math::*;
 
+embed_plist::embed_info_plist!("../Info.plist");
+
 fn poll_event() -> Option<SDL_Event> {
     let mut e = SDL_Event::default();
     if unsafe { SDL_PollEvent(&mut e) == 1 } {
@@ -124,6 +126,8 @@ pub fn app_main() {
     let mut paused = false;
     window.show();
 
+    let mut capture: Option<gfx::GpuCaptureManager> = None;
+
     'main_loop: loop {
         // Handle events
         while let Some(e) = poll_event() {
@@ -141,6 +145,11 @@ pub fn app_main() {
                     // Quit the app when "Q" is pressed
                     if key.keysym.sym == SDLK_q {
                         break 'main_loop;
+                    }
+
+                    if (type_ == SDL_KEYDOWN) && (key.keysym.sym == SDLK_t) {
+                        assert!(capture.is_none());
+                        capture = gpu.prepare_capture();
                     }
 
                     // Toggle the simulation update when SPACE is pressed
@@ -297,6 +306,9 @@ pub fn app_main() {
         }
 
         // Render
+        if let Some(c) = &mut capture {
+            c.start();
+        }
         use gfx::shaders::PerQuad;
 
         // Draw Quads
@@ -325,6 +337,10 @@ pub fn app_main() {
 
         gpu.render_and_present(&quads);
         quads.clear();
+
+        if let Some(c) = capture.take() {
+            c.stop();
+        }
 
         // TODO: Better delay
         unsafe {

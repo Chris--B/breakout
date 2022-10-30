@@ -1,5 +1,12 @@
+# Rust files
 /target
 .cargo/
+
+# Swift files
+**/.build/
+
+# Metal binaries
 *.metallib*
 
+# Generated files that we don't check in
 breakout-ios/

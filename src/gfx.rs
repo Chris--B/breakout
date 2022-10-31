@@ -397,8 +397,11 @@ impl GpuDevice {
         let pipeline_state: RenderPipelineState;
         {
             let render_pipeline_state_desc = RenderPipelineDescriptor::new();
+            render_pipeline_state_desc.set_label("Instanced Quad Pipeline");
 
             let default_lib = device.new_library_with_data(shaders::SHADERS_BIN).unwrap();
+            default_lib.set_label("Instanced Quad Lib");
+
             let func_vs = default_lib.get_function("vs_instanced_quad", None).unwrap();
             render_pipeline_state_desc.set_vertex_function(Some(&func_vs));
 
@@ -438,6 +441,7 @@ impl GpuDevice {
 
         let drawable = self.metal_layer.next_drawable().unwrap();
         let cmd_buffer = self.cmd_queue.new_command_buffer();
+        cmd_buffer.set_label(&format!("[{frame}] Main Draw CmdBuffer"));
 
         // Create & record Encoder
         let render_pass_desc = RenderPassDescriptor::new();
@@ -454,6 +458,8 @@ impl GpuDevice {
 
         if !quads.is_empty() {
             let encoder = cmd_buffer.new_render_command_encoder(render_pass_desc);
+            encoder.set_label(&format!("[{frame}] Main Draw Encoder"));
+
             encoder.set_render_pipeline_state(&self.pipeline_state);
 
             // TODO: Don't re-create buffers per-frame
@@ -474,12 +480,14 @@ impl GpuDevice {
                 std::mem::size_of_val(&view) as u64,
                 MTLResourceOptions::empty(),
             );
+            view_buffer.set_label(&format!("[{frame}] View Buffer"));
 
             let quads_buffer = self.device.new_buffer_with_data(
                 quads.as_ptr() as *const c_void,
                 (std::mem::size_of_val(&quads[0]) * quads.len()) as u64,
                 MTLResourceOptions::empty(),
             );
+            quads_buffer.set_label(&format!("[{frame}] Quads Buffer"));
 
             encoder.set_vertex_buffer(shaders::BUFFER_IDX_VIEW, Some(&view_buffer), 0);
             encoder.set_vertex_buffer(shaders::BUFFER_IDX_PER_QUAD, Some(&quads_buffer), 0);

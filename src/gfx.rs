@@ -514,7 +514,7 @@ impl GpuDevice {
         let capture_manager = CaptureManager::shared();
 
         if !capture_manager.supports_destination(MTLCaptureDestination::GpuTraceDocument) {
-            println!("!!! Capture to a GPU tracefile is not supported !!!");
+            println!("!!! Capture to a Gpu tracefile is not supported !!!");
             return None;
         }
 

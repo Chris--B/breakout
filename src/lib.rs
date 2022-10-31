@@ -139,44 +139,47 @@ pub fn app_main() {
                     break 'main_loop;
                 }
 
-                SDL_KEYDOWN | SDL_KEYUP => {
+                SDL_KEYDOWN => {
                     let key = unsafe { e.key };
 
-                    // Quit the app when "Q" is pressed
-                    if key.keysym.sym == SDLK_q {
-                        break 'main_loop;
-                    }
-
-                    if (type_ == SDL_KEYDOWN) && (key.keysym.sym == SDLK_t) {
-                        assert!(capture.is_none());
-                        capture = gpu.prepare_capture();
-                    }
-
-                    // Toggle the simulation update when SPACE is pressed
-                    if (type_ == SDL_KEYDOWN) && (key.repeat == 0) && (key.keysym.sym == SDLK_SPACE)
-                    {
-                        paused = !paused;
-                    }
-
-                    // Spawn a ball when "B" is pressed
-                    if (type_ == SDL_KEYDOWN) && (key.keysym.sym == SDLK_b) {
-                        new_ball(&mut world, init_ball_pos);
-                    }
-
-                    // Clear all balls when "C" is pressed
-                    if (type_ == SDL_KEYDOWN) && (key.repeat == 0) && (key.keysym.sym == SDLK_c) {
-                        let mut query = <(Entity, &HitableBall)>::query();
-                        let balls: Vec<_> = query.iter(&world).map(|(e, _)| *e).collect();
-                        let ball_count = balls.len();
-                        for ball in balls {
-                            world.remove(ball);
+                    match key.keysym.sym {
+                        keycode::SDLK_q => {
+                            // Quit the app when "Q" is pressed
+                            break 'main_loop;
                         }
 
-                        BALL_COUNT.store(0, SeqCst);
-
-                        if ball_count > 0 {
-                            println!("Removed {ball_count} balls");
+                        keycode::SDLK_t if key.repeat == 0 => {
+                            assert!(capture.is_none());
+                            capture = gpu.prepare_capture();
                         }
+
+                        keycode::SDLK_SPACE if key.repeat == 0 => {
+                            // Toggle the simulation update when SPACE is pressed
+                            paused = !paused;
+                        }
+
+                        keycode::SDLK_b => {
+                            // Spawn a ball when "B" is pressed
+                            new_ball(&mut world, init_ball_pos);
+                        }
+
+                        keycode::SDLK_c => {
+                            // Clear all balls when "C" is pressed
+                            let mut query = <(Entity, &HitableBall)>::query();
+                            let balls: Vec<_> = query.iter(&world).map(|(e, _)| *e).collect();
+                            let ball_count = balls.len();
+                            for ball in balls {
+                                world.remove(ball);
+                            }
+
+                            BALL_COUNT.store(0, SeqCst);
+
+                            if ball_count > 0 {
+                                println!("Removed {ball_count} balls");
+                            }
+                        }
+
+                        _ => {}
                     }
                 }
 

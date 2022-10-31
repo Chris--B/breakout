@@ -6,6 +6,13 @@ use std::str;
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
+    build_shaders();
+    build_swift();
+}
+
+fn build_shaders() {
+    println!("Building Shaders");
+
     for entry in fs::read_dir("shaders/").unwrap() {
         // ".flatten()" to skip over Err results is super unintuitive... so no thanks.
         #![allow(clippy::manual_flatten)]
@@ -17,7 +24,6 @@ fn main() {
         }
     }
 
-    // Compile shaders
     let output = Command::new("bash")
         .arg("shaders/build.sh")
         .arg(std::env::var("OUT_DIR").unwrap())
@@ -33,13 +39,16 @@ fn main() {
     eprintln!();
 
     if !output.status.success() {
-        panic!("shaders/build.sh failed:");
+        panic!("shaders/build.sh failed");
     }
 
-    build_swift();
+    println!("Building Shaders ✅");
 }
 
 fn build_swift() {
+    println!("Building Swift code");
+
+    // See: https://haim.dev/posts/2020-09-10-linking-swift-code-into-rust-app/
     let vendor = env::var("CARGO_CFG_TARGET_VENDOR").unwrap();
     if vendor != "apple" {
         return;
@@ -51,14 +60,22 @@ fn build_swift() {
     let os = "macosx";
     let target_triple = format!("{arch}-{vendor}-{os}");
 
-    if !Command::new("swift")
+    let output = Command::new("swift")
         .args(&["build", "-c", &profile, "--arch", &arch])
         .current_dir("./src/swift")
-        .status()
-        .unwrap()
-        .success()
-    {
-        panic!("Swift compilation failed")
+        .output()
+        .expect("Failed to build Swift code");
+
+    let stdout = str::from_utf8(&output.stdout).unwrap_or_default();
+    eprintln!("stdout:\n{stdout}");
+    eprintln!();
+
+    let stderr = str::from_utf8(&output.stderr).unwrap_or_default();
+    eprintln!("stderr:\n{stderr}");
+    eprintln!();
+
+    if !output.status.success() {
+        panic!("'swift build' failed");
     }
 
     println!("cargo:rustc-link-search=native=src/swift/.build/{target_triple}/{profile}");
@@ -71,8 +88,9 @@ fn build_swift() {
         "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx",
         "/usr/lib/swift",
     ];
-
     for path in runtime_library_paths {
         println!("cargo:rustc-link-search=native={path}");
     }
+
+    println!("Building Swift code ✅");
 }

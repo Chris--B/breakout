@@ -1,11 +1,11 @@
 use fermium::prelude::*;
 use metal::*;
 use objc::*;
-
-use ultraviolet::projection::lh_yup::orthographic_vk as orthographic;
-use ultraviolet::{Mat4, Vec2, Vec3};
+use rooibos_platform::prelude::*;
 
 use foreign_types_shared::ForeignTypeRef;
+use ultraviolet::projection::lh_yup::orthographic_vk as orthographic;
+use ultraviolet::{Mat4, Vec2, Vec3};
 
 use core::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 use std::ffi::{CStr, CString};
@@ -543,15 +543,6 @@ pub struct GpuCaptureManager<'a> {
     device: Device,
     tracefile: Option<String>,
     pub frames_left: usize,
-}
-
-extern "C" {
-    fn GpuCaptureManager_start(
-        capture_manager: *const MTLCaptureManager,
-        device: *const MTLDevice,
-        trace_url: &CStr,
-    ) -> bool;
-    fn GpuCaptureManager_stop(capture_manager: *const MTLCaptureManager);
 }
 
 impl<'a> GpuCaptureManager<'a> {

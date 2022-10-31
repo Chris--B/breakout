@@ -6,6 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# FFI shim
+rooibos-platform = { path = "./rooibos-platform" }
+
 # Metal Rendering
 metal = "0.24"
 objc = "0.2"

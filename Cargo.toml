@@ -13,10 +13,7 @@ foreign-types-shared = "0.1" # Use same version as `objc` & `metal`
 cstr = "0.2"
 
 # Window Management
-# fermium = "20022" # Bundles SDL 2.0.16
-# Compiling for ASi has issues, using my fork until they're resolved
-fermium = { git = "https://github.com/chris--b/fermium" }
-# fermium = { path = "../fermium" }
+fermium = "22401" # Bundles SDL 2.24.01
 
 # Mac-ism
 embed_plist = "1.2"

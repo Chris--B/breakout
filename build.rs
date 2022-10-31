@@ -3,9 +3,20 @@ use std::fs;
 use std::process::Command;
 use std::str;
 
-fn main() {
-    println!("cargo:rerun-if-changed=build.rs");
+fn rerun_if_changed(path: impl AsRef<std::path::Path>) {
+    let path = path.as_ref().display().to_string();
 
+    println!("cargo:rerun-if-changed={}", path);
+
+    match std::fs::File::open(&path) {
+        Ok(_f) => {}
+        Err(e) => {
+            println!("cargo:warning=\"{path}\" {e} - 'cargo:rerun-if-changed' is tracking a file but we can't open it!");
+        }
+    }
+}
+
+fn main() {
     build_shaders();
     build_swift();
 }
@@ -19,7 +30,7 @@ fn build_shaders() {
         if let Ok(e) = entry {
             if e.file_type().unwrap().is_file() {
                 let p = e.path().canonicalize().unwrap();
-                println!("cargo:rerun-if-changed={}", p.display());
+                rerun_if_changed(p);
             }
         }
     }
@@ -80,7 +91,17 @@ fn build_swift() {
 
     println!("cargo:rustc-link-search=native=src/swift/.build/{target_triple}/{profile}");
     println!("cargo:rustc-link-lib=static=RooibosPlatform");
-    println!("cargo:rerun-if-changed=src/swift/*.swift");
+
+    for entry in fs::read_dir("src/swift/").unwrap() {
+        // ".flatten()" to skip over Err results is super unintuitive... so no thanks.
+        #![allow(clippy::manual_flatten)]
+        if let Ok(e) = entry {
+            if e.file_type().unwrap().is_file() {
+                let p = e.path().canonicalize().unwrap();
+                rerun_if_changed(p);
+            }
+        }
+    }
 
     // `$ swift -print-target-info`
     // TODO: Query this dynamically instead

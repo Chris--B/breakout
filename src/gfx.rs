@@ -7,6 +7,7 @@ use ultraviolet::{Mat4, Vec2, Vec3};
 
 use foreign_types_shared::ForeignTypeRef;
 
+use core::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_void;
 use std::sync::Arc;
@@ -377,6 +378,8 @@ pub struct GpuDevice {
 
     view_width: f32,
     view_height: f32,
+
+    frame: AtomicUsize,
 }
 
 impl GpuDevice {
@@ -425,10 +428,14 @@ impl GpuDevice {
 
             view_width: 100.,
             view_height: 100.,
+
+            frame: AtomicUsize::new(1),
         }
     }
 
     pub fn render_and_present(&self, quads: &[shaders::PerQuad]) {
+        let frame = self.frame.fetch_add(1, SeqCst);
+
         let drawable = self.metal_layer.next_drawable().unwrap();
         let cmd_buffer = self.cmd_queue.new_command_buffer();
 
@@ -507,6 +514,7 @@ impl GpuDevice {
             capture_manager,
             device: self.device.clone(),
             tracefile: None,
+            frames_left: 0,
         })
     }
 }
@@ -526,6 +534,7 @@ pub struct GpuCaptureManager<'a> {
     capture_manager: &'a CaptureManagerRef,
     device: Device,
     tracefile: Option<String>,
+    pub frames_left: usize,
 }
 
 extern "C" {
@@ -577,6 +586,7 @@ impl<'a> GpuCaptureManager<'a> {
                 .expect("Failed to open traces dir");
 
             self.tracefile = Some(tracefile);
+            self.frames_left = 3;
         } else {
             let msg = ""; // TODO: Get this back from Swift
             println!("Failed to start a Gpu trace: \"{msg}\"");

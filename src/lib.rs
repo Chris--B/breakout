@@ -338,8 +338,19 @@ pub fn app_main() {
         gpu.render_and_present(&quads);
         quads.clear();
 
-        if let Some(c) = capture.take() {
-            c.stop();
+        if let Some(mut c) = capture.take() {
+            c.frames_left -= 1;
+
+            if c.frames_left != 0 {
+                // oops put it back
+                capture = Some(c);
+            } else {
+                // Pause things, since we're about to switch to viewing the trace
+                paused = true;
+
+                // Finish and view the trace
+                c.stop();
+            }
         }
 
         // TODO: Better delay

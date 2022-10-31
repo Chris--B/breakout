@@ -128,7 +128,12 @@ pub fn app_main() {
 
     let mut capture: Option<gfx::GpuCaptureManager> = None;
 
+    let mut pressed_left = false;
+    let mut pressed_right = false;
+
     'main_loop: loop {
+        let mut paddle_x_vel = 0.;
+
         // Handle events
         while let Some(e) = poll_event() {
             // Access to unions is unsafe, so this match block is going to get spicy
@@ -159,8 +164,18 @@ pub fn app_main() {
                         }
 
                         keycode::SDLK_b => {
-                            // Spawn a ball when "B" is pressed
-                            new_ball(&mut world, init_ball_pos);
+                            // Spawn a ball on the paddle when "B" is pressed
+
+                            let mut query = <(Entity, &Position, &Paddle)>::query();
+                            let paddle_pos = query
+                                .iter(&world)
+                                .map(|(_e, Position(pos), _p)| {
+                                    *pos + Vec2::new(0.5 * paddle_dims.x - 0.5, 3. * paddle_dims.y)
+                                })
+                                .next()
+                                .unwrap_or(init_ball_pos);
+
+                            new_ball(&mut world, paddle_pos);
                         }
 
                         keycode::SDLK_c => {
@@ -179,10 +194,33 @@ pub fn app_main() {
                             }
                         }
 
+                        keycode::SDLK_LEFT if key.repeat == 0 => {
+                            pressed_left = true;
+                        }
+
+                        keycode::SDLK_RIGHT if key.repeat == 0 => {
+                            pressed_right = true;
+                        }
+
                         _ => {}
                     }
                 }
 
+                SDL_KEYUP => {
+                    let key = unsafe { e.key };
+
+                    match key.keysym.sym {
+                        keycode::SDLK_LEFT => {
+                            pressed_left = false;
+                        }
+
+                        keycode::SDLK_RIGHT => {
+                            pressed_right = false;
+                        }
+
+                        _ => {}
+                    }
+                }
                 // On tap or drag, spawn a ball!
                 SDL_FINGERDOWN | SDL_FINGERMOTION => {
                     let _tfinger: SDL_TouchFingerEvent = unsafe { e.tfinger };
@@ -201,7 +239,25 @@ pub fn app_main() {
 
         // Advance the simulation
         if !paused {
+            // Update movement from events - this skips the OS keyboard delay
+            const PADDLE_X_VEL: f32 = 400.;
+            if pressed_left {
+                paddle_x_vel -= PADDLE_X_VEL;
+            }
+            if pressed_right {
+                paddle_x_vel += PADDLE_X_VEL;
+            }
+
             let mut out_of_bounds: Vec<Entity> = vec![];
+
+            // Move the paddle
+            let mut query = <(Entity, &mut Position, &Paddle)>::query();
+            for (entity, Position(pos), _paddle) in query.iter_mut(&mut world) {
+                pos.x += dt * paddle_x_vel;
+                // paddle heights never change
+
+                pos.x = pos.x.clamp(0., view_x - paddle_dims.x);
+            }
 
             // Advance anything with velocity
             let mut query = <(Entity, &mut Position, &mut Velocity)>::query();

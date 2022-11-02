@@ -43,3 +43,8 @@ opt-level = 3
 
 [profile.release.package."*"]
 opt-level = 3
+
+[features]
+default = []
+
+cargo_check = ["fermium/cargo_check"]

@@ -436,73 +436,94 @@ impl GpuDevice {
         }
     }
 
-    pub fn render_and_present(&self, quads: &[shaders::PerQuad]) {
-        let frame = self.frame.fetch_add(1, SeqCst);
+    fn get_next_drawable(&self) -> &MetalDrawableRef {
+        self.metal_layer
+            .next_drawable()
+            .expect("Unable to get next drawable from Metal Layer")
+    }
 
-        let drawable = self.metal_layer.next_drawable().unwrap();
+    fn get_next_cmd_buffer(&self, frame: usize) -> &CommandBufferRef {
+        // TODO: Reuse cmd buffers
         let cmd_buffer = self.cmd_queue.new_command_buffer();
         cmd_buffer.set_label(&format!("[{frame}] Main Draw CmdBuffer"));
 
-        // Create & record Encoder
-        let render_pass_desc = RenderPassDescriptor::new();
+        cmd_buffer
+    }
 
-        let color_attachment = render_pass_desc.color_attachments().object_at(0).unwrap();
-        color_attachment.set_texture(Some(drawable.texture()));
-        color_attachment.set_load_action(MTLLoadAction::Clear);
-        color_attachment.set_clear_color(MTLClearColor {
-            red: 0.,
-            green: 0.,
-            blue: 0.,
-            alpha: 1.,
-        });
-
-        if !quads.is_empty() {
-            let encoder = cmd_buffer.new_render_command_encoder(render_pass_desc);
-            encoder.set_label(&format!("[{frame}] Main Draw Encoder"));
-
-            encoder.set_render_pipeline_state(&self.pipeline_state);
-
-            // TODO: Don't re-create buffers per-frame
-            let view = shaders::View {
-                // scale our dimensions by half because this expects Vk's system which is larger than ours
-                // TODO: Don't do that.
-                mat_view_proj: orthographic(
-                    0.,                      // left
-                    0.5 * self.view_width,   // right
-                    0.,                      // bottom
-                    -0.5 * self.view_height, // top
-                    0.,                      // near
-                    1.,                      // far
-                ),
-            };
-            let view_buffer = self.device.new_buffer_with_data(
-                &view as *const _ as *const c_void,
-                std::mem::size_of_val(&view) as u64,
-                MTLResourceOptions::empty(),
-            );
-            view_buffer.set_label(&format!("[{frame}] View Buffer"));
-
-            let quads_buffer = self.device.new_buffer_with_data(
-                quads.as_ptr() as *const c_void,
-                (std::mem::size_of_val(&quads[0]) * quads.len()) as u64,
-                MTLResourceOptions::empty(),
-            );
-            quads_buffer.set_label(&format!("[{frame}] Quads Buffer"));
-
-            encoder.set_vertex_buffer(shaders::BUFFER_IDX_VIEW, Some(&view_buffer), 0);
-            encoder.set_vertex_buffer(shaders::BUFFER_IDX_PER_QUAD, Some(&quads_buffer), 0);
-
-            encoder.set_fragment_buffer(shaders::BUFFER_IDX_PER_QUAD, Some(&quads_buffer), 0);
-
-            // 6 vertices per quad
-            let tri_count = 6 * quads.len() as u64;
-            encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, tri_count);
-
-            encoder.end_encoding();
-        }
-
-        cmd_buffer.present_drawable(drawable);
+    fn finish_cmd_buffer(&self, cmd_buffer: &CommandBufferRef) {
         cmd_buffer.commit();
+    }
+
+    pub fn render_and_present(&self, quads: &[shaders::PerQuad]) {
+        // Auto-cleanup any objects we don't hold onto
+        objc::rc::autoreleasepool(|| {
+            let frame = self.frame.fetch_add(1, SeqCst);
+
+            let drawable = self.get_next_drawable();
+            let cmd_buffer = self.get_next_cmd_buffer(frame);
+
+            // Create & record Encoder
+            let render_pass_desc = RenderPassDescriptor::new();
+
+            let color_attachment = render_pass_desc.color_attachments().object_at(0).unwrap();
+            color_attachment.set_texture(Some(drawable.texture()));
+            color_attachment.set_load_action(MTLLoadAction::Clear);
+            color_attachment.set_clear_color(MTLClearColor {
+                red: 0.,
+                green: 0.,
+                blue: 0.,
+                alpha: 1.,
+            });
+
+            if !quads.is_empty() {
+                let encoder = cmd_buffer.new_render_command_encoder(render_pass_desc);
+                encoder.set_label(&format!("[{frame}] Main Draw Encoder"));
+
+                encoder.set_render_pipeline_state(&self.pipeline_state);
+
+                // TODO: Don't re-create buffers per-frame
+                let view = shaders::View {
+                    // scale our dimensions by half because this expects Vk's system which is larger than ours
+                    // TODO: Don't do that.
+                    mat_view_proj: orthographic(
+                        0.,                      // left
+                        0.5 * self.view_width,   // right
+                        0.,                      // bottom
+                        -0.5 * self.view_height, // top
+                        0.,                      // near
+                        1.,                      // far
+                    ),
+                };
+                let view_buffer = self.device.new_buffer_with_data(
+                    &view as *const _ as *const c_void,
+                    std::mem::size_of_val(&view) as u64,
+                    MTLResourceOptions::empty(),
+                );
+                view_buffer.set_label(&format!("[{frame}] View Buffer"));
+
+                let quads_buffer = self.device.new_buffer_with_data(
+                    quads.as_ptr() as *const c_void,
+                    (std::mem::size_of_val(&quads[0]) * quads.len()) as u64,
+                    MTLResourceOptions::empty(),
+                );
+                quads_buffer.set_label(&format!("[{frame}] Quads Buffer"));
+
+                encoder.set_vertex_buffer(shaders::BUFFER_IDX_VIEW, Some(&view_buffer), 0);
+                encoder.set_vertex_buffer(shaders::BUFFER_IDX_PER_QUAD, Some(&quads_buffer), 0);
+
+                encoder.set_fragment_buffer(shaders::BUFFER_IDX_PER_QUAD, Some(&quads_buffer), 0);
+
+                // 6 vertices per quad
+                let tri_count = 6 * quads.len() as u64;
+                encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, tri_count);
+
+                encoder.end_encoding();
+            }
+
+            cmd_buffer.present_drawable(drawable);
+
+            self.finish_cmd_buffer(cmd_buffer);
+        });
     }
 
     pub fn set_view(&mut self, width: f32, height: f32) {

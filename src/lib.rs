@@ -126,7 +126,7 @@ pub fn app_main() {
     let mut paused = false;
     window.show();
 
-    let mut capture: Option<gfx::GpuCaptureManager> = None;
+    let mut capture: Option<gfx::GpuCapture> = None;
 
     let mut pressed_left = false;
     let mut pressed_right = false;
@@ -151,11 +151,6 @@ pub fn app_main() {
                         keycode::SDLK_q => {
                             // Quit the app when "Q" is pressed
                             break 'main_loop;
-                        }
-
-                        keycode::SDLK_t if key.repeat == 0 => {
-                            assert!(capture.is_none());
-                            capture = gpu.prepare_capture();
                         }
 
                         keycode::SDLK_SPACE if key.repeat == 0 => {
@@ -216,6 +211,11 @@ pub fn app_main() {
 
                         keycode::SDLK_RIGHT => {
                             pressed_right = false;
+                        }
+
+                        keycode::SDLK_t if key.repeat == 0 => {
+                            assert!(capture.is_none());
+                            capture = gpu.prepare_capture();
                         }
 
                         _ => {}
@@ -365,9 +365,6 @@ pub fn app_main() {
         }
 
         // Render
-        if let Some(c) = &mut capture {
-            c.start();
-        }
         use gfx::shaders::PerQuad;
 
         // Draw Quads
@@ -398,9 +395,9 @@ pub fn app_main() {
         quads.clear();
 
         if let Some(mut c) = capture.take() {
-            c.frames_left -= 1;
+            c.mark_frame_done();
 
-            if c.frames_left != 0 {
+            if c.frames_left() != 0 {
                 // oops put it back
                 capture = Some(c);
             } else {

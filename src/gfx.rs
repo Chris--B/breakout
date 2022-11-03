@@ -510,20 +510,8 @@ impl GpuDevice {
         self.view_height = height;
     }
 
-    pub fn prepare_capture(&self) -> Option<GpuCaptureManager> {
-        let capture_manager = CaptureManager::shared();
-
-        if !capture_manager.supports_destination(MTLCaptureDestination::GpuTraceDocument) {
-            println!("!!! Capture to a Gpu tracefile is not supported !!!");
-            return None;
-        }
-
-        Some(GpuCaptureManager {
-            capture_manager,
-            device: self.device.clone(),
-            tracefile: None,
-            frames_left: 0,
-        })
+    pub fn prepare_capture(&self) -> Option<GpuCapture> {
+        GpuCapture::new(self.device.clone())
     }
 }
 
@@ -538,24 +526,31 @@ impl Drop for GpuDevice {
 }
 
 // See: https://alia-traces.github.io/metal/tools/xcode/2020/07/18/adding-framecapture-outside-of-xcode.html
-pub struct GpuCaptureManager<'a> {
+pub struct GpuCapture<'a> {
     capture_manager: &'a CaptureManagerRef,
     device: Device,
-    tracefile: Option<String>,
-    pub frames_left: usize,
+    tracefile: String,
+    frames_left: usize,
 }
 
 extern "C" {
-    fn GpuCaptureManager_start(
+    fn GpuCapture_start(
         capture_manager: *const MTLCaptureManager,
         device: *const MTLDevice,
         trace_url: &CStr,
     ) -> bool;
-    fn GpuCaptureManager_stop(capture_manager: *const MTLCaptureManager);
+    fn GpuCapture_stop(capture_manager: *const MTLCaptureManager);
 }
 
-impl<'a> GpuCaptureManager<'a> {
-    pub fn start(&mut self) {
+impl<'a> GpuCapture<'a> {
+    fn new(device: Device) -> Option<Self> {
+        let capture_manager = CaptureManager::shared();
+
+        if !capture_manager.supports_destination(MTLCaptureDestination::GpuTraceDocument) {
+            println!("!!! Capture to a Gpu tracefile is not supported !!!");
+            return None;
+        }
+
         // Make a unique trace filename in the system temp directory
         let mut tracefile = std::env::temp_dir();
         {
@@ -578,11 +573,7 @@ impl<'a> GpuCaptureManager<'a> {
         let ok = unsafe {
             let tracefile_url = CString::new(tracefile.clone()).unwrap();
 
-            GpuCaptureManager_start(
-                self.capture_manager.as_ptr(),
-                self.device.as_ptr(),
-                &tracefile_url,
-            )
+            GpuCapture_start(capture_manager.as_ptr(), device.as_ptr(), &tracefile_url)
         };
 
         if ok {
@@ -593,20 +584,26 @@ impl<'a> GpuCaptureManager<'a> {
                 .output()
                 .expect("Failed to open traces dir");
 
-            self.tracefile = Some(tracefile);
-            self.frames_left = 3;
+            Some(GpuCapture {
+                capture_manager,
+                device,
+                tracefile,
+                frames_left: 3,
+            })
         } else {
             let msg = ""; // TODO: Get this back from Swift
             println!("Failed to start a Gpu trace: \"{msg}\"");
+
+            None
         }
     }
 
     pub fn stop(self) {
         unsafe {
-            GpuCaptureManager_stop(self.capture_manager.as_ptr());
+            GpuCapture_stop(self.capture_manager.as_ptr());
         }
         println!("Finished writing Gpu Capture to");
-        println!("    {}", self.tracefile.unwrap_or_default());
+        println!("    {}", self.tracefile);
 
         // self.capture_manager.stop_capture();
 
@@ -619,5 +616,13 @@ impl<'a> GpuCaptureManager<'a> {
                 script?.executeAndReturnError(nil)
             }
         */
+    }
+
+    pub fn frames_left(&self) -> usize {
+        self.frames_left
+    }
+
+    pub fn mark_frame_done(&mut self) {
+        self.frames_left -= 1;
     }
 }

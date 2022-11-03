@@ -1,7 +1,7 @@
 import Metal
 
-@_cdecl("GpuCaptureManager_start")
-public func GpuCaptureManager_start(
+@_cdecl("GpuCapture_start")
+public func GpuCapture_start(
     captureManager: MTLCaptureManager,
     device: MTLDevice,
     tracefile: UnsafePointer<CChar>
@@ -22,7 +22,7 @@ public func GpuCaptureManager_start(
     return true
 }
 
-@_cdecl("GpuCaptureManager_stop")
-public func GpuCaptureManager_stop(captureManager: MTLCaptureManager) {
+@_cdecl("GpuCapture_stop")
+public func GpuCapture_stop(captureManager: MTLCaptureManager) {
     captureManager.stopCapture()
 }

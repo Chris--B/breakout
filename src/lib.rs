@@ -127,11 +127,6 @@ pub fn app_main() {
     let init_ball_pos = paddle_pos + Vec2::new(0.5 * paddle_dims.x - 0.5, 3. * paddle_dims.y);
     world.create_ball(init_ball_pos);
 
-    // Hoisted out of the loop to reuse the allocation
-    let mut quads = Vec::with_capacity(
-        world.bricks.len() + world.bricks.len() + 1, /* world.paddle */
-    );
-
     let mut paused = false;
     window.show();
 
@@ -345,36 +340,22 @@ pub fn app_main() {
             next.reset();
         }
 
-        // Render
-        use gfx::shaders::PerQuad;
+        // == Render ===========================================================
 
         // Draw Quads
         {
             for ball in &world.balls {
-                quads.push(PerQuad {
-                    pos: ball.pos,
-                    dims: Vec2::new(ball.radius, ball.radius),
-                    color: color::WHITE,
-                });
+                gpu.draw_quad(ball.pos, Vec2::new(ball.radius, ball.radius), color::WHITE);
             }
 
             for brick in &world.bricks {
-                quads.push(PerQuad {
-                    pos: brick.pos,
-                    dims: brick.dims,
-                    color: brick.color,
-                });
+                gpu.draw_quad(brick.pos, brick.dims, brick.color);
             }
 
-            quads.push(PerQuad {
-                pos: world.paddle.pos,
-                dims: world.paddle.dims,
-                color: color::WHITE,
-            });
+            gpu.draw_quad(world.paddle.pos, world.paddle.dims, color::WHITE);
         }
 
-        gpu.render_and_present(&quads);
-        quads.clear();
+        gpu.render_and_present();
 
         if let Some(mut c) = capture.take() {
             c.mark_frame_done();

@@ -12,7 +12,7 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_void;
 use std::sync::Arc;
 
-pub mod shaders {
+mod shaders {
     use super::*;
     use static_assertions::{assert_eq_align, assert_eq_size};
 
@@ -380,6 +380,7 @@ pub struct GpuDevice {
     view_height: f32,
 
     frame: AtomicUsize,
+    quads: Vec<shaders::PerQuad>,
 }
 
 impl GpuDevice {
@@ -433,6 +434,7 @@ impl GpuDevice {
             view_height: 100.,
 
             frame: AtomicUsize::new(1),
+            quads: vec![],
         }
     }
 
@@ -455,7 +457,13 @@ impl GpuDevice {
         cmd_buffer.commit();
     }
 
-    pub fn render_and_present(&self, quads: &[shaders::PerQuad]) {
+    pub fn draw_quad(&mut self, pos: Vec2, dims: Vec2, color: Vec3) {
+        assert_ne!(dims, Vec2::zero());
+
+        self.quads.push(shaders::PerQuad { pos, dims, color });
+    }
+
+    pub fn render_and_present(&mut self) {
         // Auto-cleanup any objects we don't hold onto
         objc::rc::autoreleasepool(|| {
             let frame = self.frame.fetch_add(1, SeqCst);
@@ -476,7 +484,7 @@ impl GpuDevice {
                 alpha: 1.,
             });
 
-            if !quads.is_empty() {
+            if !self.quads.is_empty() {
                 let encoder = cmd_buffer.new_render_command_encoder(render_pass_desc);
                 encoder.set_label(&format!("[{frame}] Main Draw Encoder"));
 
@@ -503,8 +511,8 @@ impl GpuDevice {
                 view_buffer.set_label(&format!("[{frame}] View Buffer"));
 
                 let quads_buffer = self.device.new_buffer_with_data(
-                    quads.as_ptr() as *const c_void,
-                    (std::mem::size_of_val(&quads[0]) * quads.len()) as u64,
+                    self.quads.as_ptr() as *const c_void,
+                    (std::mem::size_of_val(&self.quads[0]) * self.quads.len()) as u64,
                     MTLResourceOptions::empty(),
                 );
                 quads_buffer.set_label(&format!("[{frame}] Quads Buffer"));
@@ -515,8 +523,13 @@ impl GpuDevice {
                 encoder.set_fragment_buffer(shaders::BUFFER_IDX_PER_QUAD, Some(&quads_buffer), 0);
 
                 // 6 vertices per quad
-                let tri_count = 6 * quads.len() as u64;
+                let tri_count = 6 * self.quads.len() as u64;
                 encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, tri_count);
+
+                // !! Clearing this earlier appears to mess up quads_buffer !!
+                // I thought device.new_buffer_with_data would copy the data in its own function,
+                // but it seems to be deferring that until a draw call is issued.
+                self.quads.clear();
 
                 encoder.end_encoding();
             }

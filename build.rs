@@ -72,7 +72,7 @@ fn build_swift() {
     let target_triple = format!("{arch}-{vendor}-{os}");
 
     let output = Command::new("swift")
-        .args(&["build", "-c", &profile, "--arch", &arch])
+        .args(["build", "-c", &profile, "--arch", &arch])
         .current_dir("./src/swift")
         .output()
         .expect("Failed to build Swift code");
@@ -105,7 +105,7 @@ fn build_swift() {
 
     // `$ swift -print-target-info`
     // TODO: Query this dynamically instead
-    let runtime_library_paths = &[
+    let runtime_library_paths = [
         "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx",
         "/usr/lib/swift",
     ];

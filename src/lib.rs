@@ -252,7 +252,7 @@ pub fn app_main() {
 
             // Move the paddle
             let mut query = <(Entity, &mut Position, &Paddle)>::query();
-            for (entity, Position(pos), _paddle) in query.iter_mut(&mut world) {
+            for (_entity, Position(pos), _paddle) in query.iter_mut(&mut world) {
                 pos.x += dt * paddle_x_vel;
                 // paddle heights never change
 

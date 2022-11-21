@@ -587,12 +587,14 @@ impl<'a> GpuCapture<'a> {
                 chrono::Local::now().format("%Y-%m-%d_%H-%M-%S%.3f")
             ));
         }
-        let tracefile = format!("file://{}", tracefile.to_str().unwrap());
+        // Print it without the `file://` prefix first - it's easier to copy-and-paste without it
+        let tracefile = tracefile.to_str().unwrap().to_string();
         println!("Starting Gpu capture. Writing to...");
         println!("    {tracefile}");
 
         let ok = unsafe {
-            let tracefile_url = CString::new(tracefile.clone()).unwrap();
+            // Add `file://` because the Swift API needs it
+            let tracefile_url = CString::new(format!("file://{tracefile}")).unwrap();
 
             GpuCapture_start(capture_manager.as_ptr(), device.as_ptr(), &tracefile_url)
         };

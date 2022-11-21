@@ -10,45 +10,10 @@ mod gfx;
 mod math;
 use math::*;
 
+mod world;
+use world::*;
+
 embed_plist::embed_info_plist!("../Info.plist");
-
-#[derive(Clone, Default)]
-struct World {
-    balls: Vec<Ball>,
-    bricks: Vec<Quad>,
-    paddle: Quad,
-}
-
-#[derive(Copy, Clone, Debug, Default)]
-struct Quad {
-    pos: Vec2,
-    vel: Vec2,
-    dims: Vec2,
-    color: Vec3,
-}
-
-#[derive(Copy, Clone, Debug, Default)]
-struct Ball {
-    pos: Vec2,
-    vel: Vec2,
-    radius: f32,
-}
-
-impl World {
-    fn reset(&mut self) {
-        self.balls.clear();
-        self.bricks.clear();
-        self.paddle = Default::default();
-    }
-
-    fn create_ball(&mut self, pos: Vec2) {
-        self.balls.push(Ball {
-            pos,
-            vel: 135. * random_direction(),
-            radius: 1.,
-        });
-    }
-}
 
 mod color {
     use super::*;

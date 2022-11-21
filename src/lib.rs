@@ -3,27 +3,50 @@
 #![allow(clippy::nonminimal_bool)] // The compiler can reduce this, let me write it for humans
 
 use fermium::prelude::*;
-use legion::*;
 use ultraviolet::{Vec2, Vec3};
 
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::SeqCst;
-
-mod ecs;
 mod gfx;
-mod math;
 
-use ecs::*;
+mod math;
 use math::*;
 
 embed_plist::embed_info_plist!("../Info.plist");
 
-fn poll_event() -> Option<SDL_Event> {
-    let mut e = SDL_Event::default();
-    if unsafe { SDL_PollEvent(&mut e) == 1 } {
-        Some(e)
-    } else {
-        None
+#[derive(Clone, Default)]
+struct World {
+    balls: Vec<Ball>,
+    bricks: Vec<Quad>,
+    paddle: Quad,
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+struct Quad {
+    pos: Vec2,
+    vel: Vec2,
+    dims: Vec2,
+    color: Vec3,
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+struct Ball {
+    pos: Vec2,
+    vel: Vec2,
+    radius: f32,
+}
+
+impl World {
+    fn reset(&mut self) {
+        self.balls.clear();
+        self.bricks.clear();
+        self.paddle = Default::default();
+    }
+
+    fn create_ball(&mut self, pos: Vec2) {
+        self.balls.push(Ball {
+            pos,
+            vel: 135. * random_direction(),
+            radius: 1.,
+        });
     }
 }
 
@@ -40,25 +63,13 @@ mod color {
     pub const OHNO_PINK: Vec3 = Vec3::new(1., 0., 1.);
 }
 
-static BALL_COUNT: AtomicUsize = AtomicUsize::new(0);
-
-fn ball_count() -> usize {
-    BALL_COUNT.load(SeqCst)
-}
-
-fn new_ball(world: &mut World, ball_pos: Vec2) -> Entity {
-    let count = BALL_COUNT.fetch_add(1, SeqCst);
-
-    world.push((
-        Name(format!("Ball-#{count}")),
-        Position(ball_pos),
-        Velocity(135. * random_direction()),
-        HitableBall { radius: 1. },
-        DrawableColoredBall {
-            radius: 1.,
-            color: color::WHITE,
-        },
-    ))
+fn poll_event() -> Option<SDL_Event> {
+    let mut e = SDL_Event::default();
+    if unsafe { SDL_PollEvent(&mut e) == 1 } {
+        Some(e)
+    } else {
+        None
+    }
 }
 
 pub fn app_main() {
@@ -68,6 +79,7 @@ pub fn app_main() {
     let window = gfx::Window::new(window_width, window_height);
     let mut gpu = gfx::GpuDevice::new(&window);
     let mut world = World::default();
+    let mut next = World::default();
 
     // Shape of a brick & the paddle
     let dims = Vec2::new(5., 1.);
@@ -92,36 +104,33 @@ pub fn app_main() {
             let pos_y = view_y - (dims.y + 1.) * (y as f32 + 1.);
             let pos = Vec2::new(pos_x, pos_y);
 
-            world.push((
-                Name(format!("Brick@({pos_x}, {pos_y})")),
-                Position(pos),
-                HitableQuad { dims },
-                DrawableColoredQuad { dims, color },
-                Breakable,
-            ));
+            world.bricks.push(Quad {
+                pos,
+                vel: Vec2::zero(),
+                dims,
+                color,
+            });
         }
     }
 
     // Add a user-controlled paddle
     let paddle_pos = Vec2::new(0.5 * view_x - dims.x / 2., 0.05 * view_y);
     let paddle_dims = dims;
-    world.push((
-        Name("Paddle".to_string()),
-        Position(paddle_pos),
-        HitableQuad { dims: paddle_dims },
-        DrawableColoredQuad {
-            dims: paddle_dims,
-            color: color::WHITE,
-        },
-        Paddle,
-    ));
+    world.paddle = Quad {
+        pos: paddle_pos,
+        vel: Vec2::zero(),
+        dims: paddle_dims,
+        color: color::WHITE,
+    };
 
     // Spawn a starter ball
     let init_ball_pos = paddle_pos + Vec2::new(0.5 * paddle_dims.x - 0.5, 3. * paddle_dims.y);
-    new_ball(&mut world, init_ball_pos);
+    world.create_ball(init_ball_pos);
 
     // Hoisted out of the loop to reuse the allocation
-    let mut quads = Vec::with_capacity(world.len());
+    let mut quads = Vec::with_capacity(
+        world.bricks.len() + world.bricks.len() + 1, /* world.paddle */
+    );
 
     let mut paused = false;
     window.show();
@@ -160,33 +169,17 @@ pub fn app_main() {
 
                         keycode::SDLK_b => {
                             // Spawn a ball on the paddle when "B" is pressed
+                            let pos = world.paddle.pos
+                                + Vec2::new(0.5 * paddle_dims.x - 0.5, 3. * paddle_dims.y);
 
-                            let mut query = <(Entity, &Position, &Paddle)>::query();
-                            let paddle_pos = query
-                                .iter(&world)
-                                .map(|(_e, Position(pos), _p)| {
-                                    *pos + Vec2::new(0.5 * paddle_dims.x - 0.5, 3. * paddle_dims.y)
-                                })
-                                .next()
-                                .unwrap_or(init_ball_pos);
-
-                            new_ball(&mut world, paddle_pos);
+                            world.create_ball(pos);
                         }
 
                         keycode::SDLK_c => {
                             // Clear all balls when "C" is pressed
-                            let mut query = <(Entity, &HitableBall)>::query();
-                            let balls: Vec<_> = query.iter(&world).map(|(e, _)| *e).collect();
-                            let ball_count = balls.len();
-                            for ball in balls {
-                                world.remove(ball);
-                            }
-
-                            BALL_COUNT.store(0, SeqCst);
-
-                            if ball_count > 0 {
-                                println!("Removed {ball_count} balls");
-                            }
+                            let ball_count = world.balls.len();
+                            world.balls.clear();
+                            println!("Removed {ball_count} balls");
                         }
 
                         keycode::SDLK_LEFT if key.repeat == 0 => {
@@ -225,7 +218,7 @@ pub fn app_main() {
                 SDL_FINGERDOWN | SDL_FINGERMOTION => {
                     let _tfinger: SDL_TouchFingerEvent = unsafe { e.tfinger };
 
-                    new_ball(&mut world, init_ball_pos);
+                    world.create_ball(init_ball_pos);
                 }
 
                 // Ignore all other events
@@ -248,69 +241,51 @@ pub fn app_main() {
                 paddle_x_vel += PADDLE_X_VEL;
             }
 
-            let mut out_of_bounds: Vec<Entity> = vec![];
+            // Update the paddle
+            {
+                next.paddle = world.paddle;
 
-            // Move the paddle
-            let mut query = <(Entity, &mut Position, &Paddle)>::query();
-            for (_entity, Position(pos), _paddle) in query.iter_mut(&mut world) {
-                pos.x += dt * paddle_x_vel;
-                // paddle heights never change
-
-                pos.x = pos.x.clamp(0., view_x - paddle_dims.x);
+                // Update movement
+                next.paddle.pos.x = (world.paddle.pos.x + dt * paddle_x_vel)
+                    // Keep the paddle in bounds
+                    .clamp(0., view_x - paddle_dims.x);
+                // The paddle only slides left & right, so don't modify pos.y
+                next.paddle.pos.y = world.paddle.pos.y;
             }
 
-            // Advance anything with velocity
-            let mut query = <(Entity, &mut Position, &mut Velocity)>::query();
-            for (entity, Position(pos), Velocity(vel)) in query.iter_mut(&mut world) {
-                *pos += dt * *vel;
+            // Update bricks by checking if a ball has hit them
+            // Update ball velocities by checking if they hit a brick OR the paddle -- IN PLACE
+            {
+                fn bounce_against_quad(ball: &mut Ball, brick: &Quad) -> bool {
+                    let radius_sq = ball.radius * ball.radius;
 
-                if !(0. < pos.x && pos.x < view_x) || !(0. < pos.y && pos.y < view_y) {
-                    out_of_bounds.push(*entity);
-                }
-            }
-
-            // Check if any of the balls hit a brick
-            let mut ball_query = <(Entity, &Position, &HitableBall)>::query();
-            let mut bricks_query = <(Entity, &Position, &HitableQuad, Option<&Breakable>)>::query();
-
-            let mut needs_to_break: Vec<Entity> = vec![];
-            let mut needs_to_bounce: Vec<(Entity, Bounce)> = vec![];
-
-            for (ball, Position(ball_pos), HitableBall { radius }) in ball_query.iter(&world) {
-                let radius_sq = radius * radius;
-
-                for (brick, Position(brick_pos), hitable, maybe_breakable) in
-                    bricks_query.iter(&world)
-                {
-                    let aabb = Aabb::new_from_quad(*brick_pos, hitable.dims);
+                    let aabb = Aabb::new_from_quad(brick.pos, brick.dims);
                     let center = aabb.center();
                     let extents = aabb.half_extents();
 
-                    let dist_clamped = (*ball_pos - center).clamped(-extents, extents);
+                    let dist_clamped = (ball.pos - center).clamped(-extents, extents);
                     let closest_on_or_in_aabb = center + dist_clamped;
 
-                    if (closest_on_or_in_aabb - *ball_pos).mag_sq() < radius_sq {
-                        if maybe_breakable.is_some() {
-                            needs_to_break.push(*brick);
-                        }
+                    if (closest_on_or_in_aabb - ball.pos).mag_sq() < radius_sq {
+                        // TODO: Compute bounce on the ball
 
                         let x_delta;
                         let y_delta;
 
-                        if ball_pos.x <= aabb.min.x {
-                            x_delta = ball_pos.x - aabb.min.x;
-                        } else if ball_pos.x >= aabb.max.x {
-                            x_delta = ball_pos.x - aabb.max.x;
+                        if ball.pos.x <= aabb.min.x {
+                            x_delta = ball.pos.x - aabb.min.x;
+                        } else if ball.pos.x >= aabb.max.x {
+                            x_delta = ball.pos.x - aabb.max.x;
                         } else {
-                            x_delta = *radius;
+                            x_delta = ball.radius;
                         }
 
-                        if ball_pos.y <= aabb.min.y {
-                            y_delta = ball_pos.y - aabb.min.y;
-                        } else if ball_pos.y >= aabb.max.y {
-                            y_delta = ball_pos.y - aabb.max.y;
+                        if ball.pos.y <= aabb.min.y {
+                            y_delta = ball.pos.y - aabb.min.y;
+                        } else if ball.pos.y >= aabb.max.y {
+                            y_delta = ball.pos.y - aabb.max.y;
                         } else {
-                            y_delta = *radius;
+                            y_delta = ball.radius;
                         }
 
                         let normal = if x_delta.abs() < y_delta.abs() {
@@ -321,47 +296,53 @@ pub fn app_main() {
                             Vec2::new(-1., -1.).normalized()
                         };
 
-                        needs_to_bounce.push((*ball, Bounce(normal)));
+                        ball.vel = ball.vel.reflected(normal);
+
+                        true
+                    } else {
+                        false
+                    }
+                }
+
+                for brick in &world.bricks {
+                    let mut brick_breaks = false;
+
+                    for ball in &mut world.balls {
+                        // If a ball hit this brick, then it will break
+
+                        brick_breaks |= bounce_against_quad(ball, brick);
+                    }
+
+                    // If no ball hit this brick, then we delete it (by omission)
+                    if !brick_breaks {
+                        next.bricks.push(*brick);
+                    }
+                }
+
+                for ball in &mut world.balls {
+                    bounce_against_quad(ball, &world.paddle);
+                }
+            }
+
+            // Update all balls' position from velocity
+            {
+                for ball in &world.balls {
+                    let mut next_ball = *ball;
+                    let Ball { pos, vel, .. } = *ball;
+
+                    // Basic physics step
+                    next_ball.pos = pos + dt * vel;
+
+                    // If it's still in bounds, copy it to the next frameq
+                    // (TODO: include radius in this math)
+                    if (0. < pos.x && pos.x < view_x) && (0. < pos.y && pos.y < view_y) {
+                        next.balls.push(next_ball);
                     }
                 }
             }
 
-            // Remove anything that broke
-            for breakable in needs_to_break {
-                world.remove(breakable);
-            }
-
-            // Bounce anything that needs to bounce
-            {
-                // TODO: This can't be the best way to do this...
-                // Add component to track bounces
-                for (entity, bounce) in &needs_to_bounce {
-                    let mut entry = world.entry(*entity).unwrap();
-                    entry.add_component(*bounce);
-                }
-
-                // Update velocity for anything with our Bounce component
-                let mut bounce_query = <(&mut Velocity, &Bounce)>::query();
-                for (Velocity(vel), Bounce(bounce)) in bounce_query.iter_mut(&mut world) {
-                    *vel = vel.reflected(*bounce);
-                }
-
-                // Remove the bounce components
-                for (entity, _bounce) in needs_to_bounce {
-                    let mut entry = world.entry(entity).unwrap();
-                    entry.remove_component::<Bounce>();
-                }
-            }
-
-            // Remove anything out of bounds
-            for entity in out_of_bounds {
-                // let entry = world.entry(entity).unwrap();
-                // if let Ok(name) = entry.get_component::<Name>() {
-                //     println!("Removing out of bounds entity \"{name}\"");
-                // }
-
-                world.remove(entity);
-            }
+            std::mem::swap(&mut world, &mut next);
+            next.reset();
         }
 
         // Render
@@ -369,26 +350,27 @@ pub fn app_main() {
 
         // Draw Quads
         {
-            let mut query = <(&Position, &DrawableColoredQuad)>::query();
-            for (Position(pos), drawable) in query.iter(&world) {
+            for ball in &world.balls {
                 quads.push(PerQuad {
-                    pos: *pos,
-                    dims: drawable.dims,
-                    color: drawable.color,
+                    pos: ball.pos,
+                    dims: Vec2::new(ball.radius, ball.radius),
+                    color: color::WHITE,
                 });
             }
-        }
 
-        // Draw Balls
-        {
-            let mut query = <(&Position, &DrawableColoredBall)>::query();
-            for (Position(pos), drawable) in query.iter(&world) {
+            for brick in &world.bricks {
                 quads.push(PerQuad {
-                    pos: *pos,
-                    dims: Vec2::new(drawable.radius, drawable.radius),
-                    color: drawable.color,
+                    pos: brick.pos,
+                    dims: brick.dims,
+                    color: brick.color,
                 });
             }
+
+            quads.push(PerQuad {
+                pos: world.paddle.pos,
+                dims: world.paddle.dims,
+                color: color::WHITE,
+            });
         }
 
         gpu.render_and_present(&quads);

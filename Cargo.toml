@@ -21,9 +21,6 @@ fermium = { git = "https://github.com/chris--b/fermium" }
 # Mac-ism
 embed_plist = "1.2"
 
-# ECS
-legion = { version ="0.4", default-features = false }
-
 # Math
 ultraviolet = { version = "0.9", features = [ "bytemuck", "f64", "int"] }
 rand = "0.8"

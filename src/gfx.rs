@@ -436,21 +436,22 @@ impl GpuDevice {
         }
     }
 
-    fn get_next_drawable(&self) -> &MetalDrawableRef {
+    fn get_next_drawable(&self) -> MetalDrawable {
         self.metal_layer
             .next_drawable()
             .expect("Unable to get next drawable from Metal Layer")
+            .to_owned()
     }
 
-    fn get_next_cmd_buffer(&self, frame: usize) -> &CommandBufferRef {
+    fn get_next_cmd_buffer(&self, frame: usize) -> CommandBuffer {
         // TODO: Reuse cmd buffers
-        let cmd_buffer = self.cmd_queue.new_command_buffer();
+        let cmd_buffer = self.cmd_queue.new_command_buffer().to_owned();
         cmd_buffer.set_label(&format!("[{frame}] Main Draw CmdBuffer"));
 
         cmd_buffer
     }
 
-    fn finish_cmd_buffer(&self, cmd_buffer: &CommandBufferRef) {
+    fn finish_cmd_buffer(&self, cmd_buffer: &CommandBuffer) {
         cmd_buffer.commit();
     }
 
@@ -520,9 +521,9 @@ impl GpuDevice {
                 encoder.end_encoding();
             }
 
-            cmd_buffer.present_drawable(drawable);
+            cmd_buffer.present_drawable(&drawable);
 
-            self.finish_cmd_buffer(cmd_buffer);
+            self.finish_cmd_buffer(&cmd_buffer);
         });
     }
 
@@ -547,8 +548,8 @@ impl Drop for GpuDevice {
 }
 
 // See: https://alia-traces.github.io/metal/tools/xcode/2020/07/18/adding-framecapture-outside-of-xcode.html
-pub struct GpuCapture<'a> {
-    capture_manager: &'a CaptureManagerRef,
+pub struct GpuCapture {
+    capture_manager: CaptureManager,
     device: Device,
     tracefile: String,
     frames_left: usize,
@@ -563,9 +564,9 @@ extern "C" {
     fn GpuCapture_stop(capture_manager: *const MTLCaptureManager);
 }
 
-impl<'a> GpuCapture<'a> {
+impl GpuCapture {
     fn new(device: Device) -> Option<Self> {
-        let capture_manager = CaptureManager::shared();
+        let capture_manager = CaptureManager::shared().to_owned();
 
         if !capture_manager.supports_destination(MTLCaptureDestination::GpuTraceDocument) {
             println!("!!! Capture to a Gpu tracefile is not supported !!!");

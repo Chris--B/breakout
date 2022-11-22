@@ -4,6 +4,7 @@ use ultraviolet::{Vec2, Vec3};
 pub struct World {
     pub balls: Vec<Ball>,
     pub bricks: Vec<Quad>,
+    pub unbreakable_bricks: Vec<Quad>,
     pub paddle: Quad,
 }
 
@@ -26,6 +27,7 @@ impl World {
     pub fn reset(&mut self) {
         self.balls.clear();
         self.bricks.clear();
+        self.unbreakable_bricks.clear();
         self.paddle = Default::default();
     }
 

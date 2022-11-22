@@ -19,6 +19,7 @@ mod color {
     use super::*;
 
     pub const WHITE: Vec3 = Vec3::new(0.84, 0.84, 0.84);
+    pub const GRAY: Vec3 = Vec3::new(0.27, 0.27, 0.27);
 
     pub const RED: Vec3 = Vec3::new(0.60, 0., 0.);
     pub const ORANGE: Vec3 = Vec3::new(0.84, 0.60, 0.);
@@ -27,6 +28,9 @@ mod color {
 
     pub const OHNO_PINK: Vec3 = Vec3::new(1., 0., 1.);
 }
+
+pub const PADDLE_COLOR: Vec3 = color::WHITE;
+pub const UNBREAKABLE_BRICK_COLOR: Vec3 = color::GRAY;
 
 fn poll_event() -> Option<SDL_Event> {
     let mut e = SDL_Event::default();
@@ -75,8 +79,39 @@ pub fn app_main() {
     let view_y = view_x * (window_height as f32 / window_width as f32);
     gpu.set_view(view_x, view_y);
 
+    // Add some unbreakable bricks off screen on the top, left and right
+    {
+        // Side-walls don't move
+        let vel = Vec2::zero();
+
+        // Left
+        world.unbreakable_bricks.push(Quad {
+            pos: Vec2::new(0., 0.),
+            vel,
+            dims: Vec2::new(1., view_y),
+            color: color::GRAY,
+        });
+
+        // Right
+        world.unbreakable_bricks.push(Quad {
+            pos: Vec2::new(view_x - 1., 0.),
+            vel,
+            dims: Vec2::new(1., view_y),
+            color: color::GRAY,
+        });
+
+        // Top
+        world.unbreakable_bricks.push(Quad {
+            pos: Vec2::new(0., view_y - 1.),
+            vel,
+            dims: Vec2::new(view_x, 1.),
+            color: color::GRAY,
+        });
+    }
+
     // (x, y) are position in the grid
     for y in 0..55 {
+        let vel = Vec2::zero();
         let color: Vec3 = match y {
             0..=1 => color::RED,
             2..=3 => color::ORANGE,
@@ -85,17 +120,29 @@ pub fn app_main() {
             _ => color::OHNO_PINK,
         };
         for x in 0..14 {
-            // Note: Our x coordinate here must match the calculation© for view_x above
+            // Note: Our x coordinate here must match the calculation for view_x above
             let pos_x = (dims.x + 1.) * (x as f32) + 1.;
             let pos_y = view_y - (dims.y + 1.) * (y as f32 + 1.);
             let pos = Vec2::new(pos_x, pos_y);
 
-            world.bricks.push(Quad {
-                pos,
-                vel: Vec2::zero(),
-                dims,
-                color,
-            });
+            use rand::prelude::*;
+            let coin_clip: u8 = rand::thread_rng().gen();
+
+            if y > 7 && coin_clip < (0xFF / 8) {
+                world.unbreakable_bricks.push(Quad {
+                    pos,
+                    vel,
+                    dims,
+                    color: UNBREAKABLE_BRICK_COLOR,
+                });
+            } else {
+                world.bricks.push(Quad {
+                    pos,
+                    vel,
+                    dims,
+                    color,
+                });
+            }
         }
     }
 
@@ -218,7 +265,7 @@ pub fn app_main() {
                 next.paddle.pos.y = world.paddle.pos.y;
             }
 
-            // Update bricks by checking if a ball has hit them
+            // Update breakable bricks by checking if a ball has hit them
             // Update ball velocities by checking if they hit a brick OR the paddle -- IN PLACE
             {
                 fn bounce_against_quad(ball: &mut Ball, brick: &Quad) -> bool {
@@ -269,12 +316,12 @@ pub fn app_main() {
                     }
                 }
 
+                // Check breakable bricks
                 for brick in &world.bricks {
                     let mut brick_breaks = false;
 
                     for ball in &mut world.balls {
                         // If a ball hit this brick, then it will break
-
                         brick_breaks |= bounce_against_quad(ball, brick);
                     }
 
@@ -283,6 +330,16 @@ pub fn app_main() {
                         next.bricks.push(*brick);
                     }
                 }
+
+                // Check UN-breakable bricks
+                for brick in &world.unbreakable_bricks {
+                    for ball in &mut world.balls {
+                        bounce_against_quad(ball, brick);
+                    }
+                }
+
+                // Unbreakable bricks always get copied over
+                next.unbreakable_bricks = std::mem::take(&mut world.unbreakable_bricks);
 
                 for ball in &mut world.balls {
                     bounce_against_quad(ball, &world.paddle);
@@ -298,7 +355,7 @@ pub fn app_main() {
                     // Basic physics step
                     next_ball.pos = pos + dt * vel;
 
-                    // If it's still in bounds, copy it to the next frameq
+                    // If it's still in bounds, copy it to the next frame
                     // (TODO: include radius in this math)
                     if (0. < pos.x && pos.x < view_x) && (0. < pos.y && pos.y < view_y) {
                         next.balls.push(next_ball);
@@ -323,8 +380,13 @@ pub fn app_main() {
                 gpu.draw_quad(brick.pos, brick.dims, brick.color);
             }
 
+            // Unbreakable bricks
+            for brick in &world.unbreakable_bricks {
+                gpu.draw_quad(brick.pos, brick.dims, brick.color);
+            }
+
             // Paddle
-            gpu.draw_quad(world.paddle.pos, world.paddle.dims, color::WHITE);
+            gpu.draw_quad(world.paddle.pos, world.paddle.dims, PADDLE_COLOR);
         }
 
         gpu.render_and_present();

@@ -83,29 +83,35 @@ pub fn app_main() {
     {
         // Side-walls don't move
         let vel = Vec2::zero();
+        let color = UNBREAKABLE_BRICK_COLOR;
+
+        // Swap the commented `pos` below to move the walls in-frame to see them
 
         // Left
         world.unbreakable_bricks.push(Quad {
-            pos: Vec2::new(0., 0.),
+            // pos: Vec2::new(0., 0.),
+            pos: Vec2::new(0. - 1., 0.),
             vel,
             dims: Vec2::new(1., view_y),
-            color: color::GRAY,
+            color,
         });
 
         // Right
         world.unbreakable_bricks.push(Quad {
-            pos: Vec2::new(view_x - 1., 0.),
+            // pos: Vec2::new(view_x - 1., 0.),
+            pos: Vec2::new(view_x, 0.),
             vel,
             dims: Vec2::new(1., view_y),
-            color: color::GRAY,
+            color,
         });
 
         // Top
         world.unbreakable_bricks.push(Quad {
-            pos: Vec2::new(0., view_y - 1.),
+            // pos: Vec2::new(0., view_y - 1.),
+            pos: Vec2::new(0., view_y),
             vel,
             dims: Vec2::new(view_x, 1.),
-            color: color::GRAY,
+            color,
         });
     }
 
@@ -125,24 +131,12 @@ pub fn app_main() {
             let pos_y = view_y - (dims.y + 1.) * (y as f32 + 1.);
             let pos = Vec2::new(pos_x, pos_y);
 
-            use rand::prelude::*;
-            let coin_clip: u8 = rand::thread_rng().gen();
-
-            if y > 7 && coin_clip < (0xFF / 8) {
-                world.unbreakable_bricks.push(Quad {
-                    pos,
-                    vel,
-                    dims,
-                    color: UNBREAKABLE_BRICK_COLOR,
-                });
-            } else {
-                world.bricks.push(Quad {
-                    pos,
-                    vel,
-                    dims,
-                    color,
-                });
-            }
+            world.bricks.push(Quad {
+                pos,
+                vel,
+                dims,
+                color,
+            });
         }
     }
 

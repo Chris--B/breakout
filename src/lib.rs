@@ -8,7 +8,7 @@ use ultraviolet::{Vec2, Vec3};
 mod gfx;
 
 mod math;
-use math::*;
+use math::{sign, Aabb};
 
 mod world;
 use world::*;
@@ -34,6 +34,27 @@ fn poll_event() -> Option<SDL_Event> {
         Some(e)
     } else {
         None
+    }
+}
+
+// This 'static is kind of a lie - values here can and will update while this
+// reference exists. We only read it AFTER calling SDL_PollEvent, so this is safe.
+struct KeyboardState(&'static [u8]);
+
+impl core::ops::Index<SDL_Scancode> for KeyboardState {
+    type Output = u8;
+
+    fn index(&self, index: SDL_Scancode) -> &Self::Output {
+        &self.0[index.0 as usize]
+    }
+}
+
+fn get_keyboard_state() -> KeyboardState {
+    unsafe {
+        let mut num_keys: i32 = 0;
+        let ptr = SDL_GetKeyboardState(&mut num_keys);
+
+        KeyboardState(std::slice::from_raw_parts(ptr, num_keys as usize))
     }
 }
 
@@ -80,7 +101,7 @@ pub fn app_main() {
 
     // Add a user-controlled paddle
     let paddle_pos = Vec2::new(0.5 * view_x - dims.x / 2., 0.05 * view_y);
-    let paddle_dims = dims;
+    let paddle_dims = Vec2::new(dims.x * 4., dims.y);
     world.paddle = Quad {
         pos: paddle_pos,
         vel: Vec2::zero(),
@@ -93,17 +114,16 @@ pub fn app_main() {
     world.create_ball(init_ball_pos);
 
     let mut paused = false;
-    window.show();
-
     let mut capture: Option<gfx::GpuCapture> = None;
 
-    let mut pressed_left = false;
-    let mut pressed_right = false;
-
+    window.show();
     'main_loop: loop {
         let mut paddle_x_vel = 0.;
 
-        // Handle events
+        // == Handle events ====================================================
+
+        // Pump key presses
+        // Note: Not all key events are handled here.
         while let Some(e) = poll_event() {
             // Access to unions is unsafe, so this match block is going to get spicy
             let type_ = unsafe { e.type_ };
@@ -127,27 +147,11 @@ pub fn app_main() {
                             paused = !paused;
                         }
 
-                        keycode::SDLK_b => {
-                            // Spawn a ball on the paddle when "B" is pressed
-                            let pos = world.paddle.pos
-                                + Vec2::new(0.5 * paddle_dims.x - 0.5, 3. * paddle_dims.y);
-
-                            world.create_ball(pos);
-                        }
-
                         keycode::SDLK_c => {
                             // Clear all balls when "C" is pressed
                             let ball_count = world.balls.len();
                             world.balls.clear();
                             println!("Removed {ball_count} balls");
-                        }
-
-                        keycode::SDLK_LEFT if key.repeat == 0 => {
-                            pressed_left = true;
-                        }
-
-                        keycode::SDLK_RIGHT if key.repeat == 0 => {
-                            pressed_right = true;
                         }
 
                         _ => {}
@@ -158,14 +162,6 @@ pub fn app_main() {
                     let key = unsafe { e.key };
 
                     match key.keysym.sym {
-                        keycode::SDLK_LEFT => {
-                            pressed_left = false;
-                        }
-
-                        keycode::SDLK_RIGHT => {
-                            pressed_right = false;
-                        }
-
                         keycode::SDLK_t if key.repeat == 0 => {
                             assert!(capture.is_none());
                             capture = gpu.prepare_capture();
@@ -186,7 +182,16 @@ pub fn app_main() {
             }
         }
 
-        // Update gamestate
+        // Simplified interface for per-frame actions that depend on a key being pressed or not.
+        let keyboard = get_keyboard_state();
+
+        if keyboard[SDL_SCANCODE_B] != 0 {
+            // Spawn a ball on the paddle when "B" is pressed
+            let pos = world.paddle.pos + Vec2::new(0.5 * paddle_dims.x - 0.5, 3. * paddle_dims.y);
+            world.create_ball(pos);
+        }
+
+        // == Update gamestate =================================================
         const DELAY_MS: u32 = 5;
         let dt = (DELAY_MS as f32) * 1e-3;
 
@@ -194,10 +199,10 @@ pub fn app_main() {
         if !paused {
             // Update movement from events - this skips the OS keyboard delay
             const PADDLE_X_VEL: f32 = 400.;
-            if pressed_left {
+            if keyboard[SDL_SCANCODE_LEFT] != 0 {
                 paddle_x_vel -= PADDLE_X_VEL;
             }
-            if pressed_right {
+            if keyboard[SDL_SCANCODE_RIGHT] != 0 {
                 paddle_x_vel += PADDLE_X_VEL;
             }
 
@@ -306,17 +311,19 @@ pub fn app_main() {
         }
 
         // == Render ===========================================================
-
-        // Draw Quads
+        // Draw Quads (this is everything atm)
         {
+            // Balls
             for ball in &world.balls {
                 gpu.draw_quad(ball.pos, Vec2::new(ball.radius, ball.radius), color::WHITE);
             }
 
+            // Bricks
             for brick in &world.bricks {
                 gpu.draw_quad(brick.pos, brick.dims, brick.color);
             }
 
+            // Paddle
             gpu.draw_quad(world.paddle.pos, world.paddle.dims, color::WHITE);
         }
 

@@ -136,16 +136,6 @@ pub fn sign(x: f32) -> f32 {
     0.
 }
 
-pub fn random_direction() -> Vec2 {
-    use rand::prelude::*;
-
-    // Random angle from (0, π) - this is the hemisphere facing up in the simulation
-    let t: f32 = rand::thread_rng().gen();
-    let θ: f32 = std::f32::consts::PI * t;
-
-    Vec2::new(f32::cos(θ), f32::sin(θ))
-}
-
 #[cfg(test)]
 mod t {
     use super::*;

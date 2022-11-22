@@ -1,7 +1,5 @@
 use ultraviolet::{Vec2, Vec3};
 
-use crate::math::*;
-
 #[derive(Clone, Default)]
 pub struct World {
     pub balls: Vec<Ball>,
@@ -38,4 +36,15 @@ impl World {
             radius: 1.,
         });
     }
+}
+
+fn random_direction() -> Vec2 {
+    use rand::prelude::*;
+
+    // Random angle from (π/2, 3π/4) - this is the center half of the hemisphere
+    // facing up in the simulation
+    let t: f32 = rand::thread_rng().gen();
+    let θ: f32 = 0.5 * std::f32::consts::PI * t + 0.25 * std::f32::consts::PI;
+
+    Vec2::new(f32::cos(θ), f32::sin(θ))
 }

@@ -21,7 +21,14 @@ namespace breakout {
         packed_float2 pos;
         packed_float2 dims;
         packed_float3 color;
+        uint32_t      flags;
     };
-    CheckSize(PerQuad, 4 * (2 + 2 + 3));
+    CheckSize(PerQuad, 4 * (2 + 2 + 3 + 1));
     CheckAlign(PerQuad, 4);
+
+    /// Default behavior for our Quad renderer. Renders a single-colored quad.
+    constant constexpr uint32_t PER_QUAD_FLAGS_NONE = 0;
+
+    /// When this bit is set, the quad is rendered as an oval instead of a rectangle
+    constant constexpr uint32_t PER_QUAD_FLAGS_AS_CIRCLE = (1 << 0);
 }

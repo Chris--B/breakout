@@ -12,6 +12,7 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_void;
 use std::sync::Arc;
 
+#[allow(unused_parens)]
 mod shaders {
     use super::*;
     use static_assertions::{assert_eq_align, assert_eq_size};
@@ -44,9 +45,13 @@ mod shaders {
         pub pos: Vec2,
         pub dims: Vec2,
         pub color: Vec3,
+        pub flags: u32,
     }
-    assert_eq_size!(PerQuad, [f32; 2 + 2 + 3]);
+    assert_eq_size!(PerQuad, [f32; 2 + 2 + 3 + 1]);
     assert_eq_align!(PerQuad, f32);
+
+    pub const PER_QUAD_FLAGS_NONE: u32 = 0;
+    pub const PER_QUAD_FLAGS_AS_CIRCLE: u32 = (1 << 0);
 
     impl Default for PerQuad {
         fn default() -> Self {
@@ -54,6 +59,7 @@ mod shaders {
                 pos: Vec2::new(0., 0.),
                 dims: Vec2::new(1., 1.),
                 color: Vec3::new(1., 0., 1.),
+                flags: PER_QUAD_FLAGS_NONE,
             }
         }
     }
@@ -457,10 +463,28 @@ impl GpuDevice {
         cmd_buffer.commit();
     }
 
+    pub fn draw_circle(&mut self, pos: Vec2, radius: f32, color: Vec3) {
+        assert_ne!(radius, 0.);
+
+        // Quad dims are side lengths, so double radius to get diameter
+        let dims = 2. * Vec2::new(radius, radius);
+        self.quads.push(shaders::PerQuad {
+            pos,
+            dims,
+            color,
+            flags: shaders::PER_QUAD_FLAGS_AS_CIRCLE,
+        });
+    }
+
     pub fn draw_quad(&mut self, pos: Vec2, dims: Vec2, color: Vec3) {
         assert_ne!(dims, Vec2::zero());
 
-        self.quads.push(shaders::PerQuad { pos, dims, color });
+        self.quads.push(shaders::PerQuad {
+            pos,
+            dims,
+            color,
+            flags: shaders::PER_QUAD_FLAGS_NONE,
+        });
     }
 
     pub fn render_and_present(&mut self) {

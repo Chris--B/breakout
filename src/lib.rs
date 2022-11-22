@@ -366,7 +366,7 @@ pub fn app_main() {
         {
             // Balls
             for ball in &world.balls {
-                gpu.draw_quad(ball.pos, Vec2::new(ball.radius, ball.radius), color::WHITE);
+                gpu.draw_circle(ball.pos, ball.radius, color::WHITE);
             }
 
             // Bricks

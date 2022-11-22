@@ -35,7 +35,7 @@ impl World {
         self.balls.push(Ball {
             pos,
             vel: 135. * random_direction(),
-            radius: 1.,
+            radius: 0.5,
         });
     }
 }

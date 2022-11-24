@@ -12,6 +12,8 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_void;
 use std::sync::Arc;
 
+use crate::check_sdl_error;
+
 #[allow(unused_parens)]
 mod shaders {
     use super::*;
@@ -211,41 +213,6 @@ pub fn print_device_info(device: &DeviceRef) {
         } else {
             println!("    os_proc_available_memory()      {bytes} bytes");
         }
-    }
-}
-
-/// Returns true when there is not error. Think:
-/// ```rust,ignore
-/// let ok = check_sdl_error("SDL_Foo");
-/// ```
-fn check_sdl_error(func: &str) -> bool {
-    // We can't use `c_char` in literals, we HAVE to cast
-    #![allow(clippy::unnecessary_cast)]
-
-    use fermium::prelude::*;
-
-    unsafe {
-        let mut msg_buf = [0 as c_char; 512];
-        SDL_GetErrorMsg(&mut msg_buf as *mut c_char, msg_buf.len() as i32);
-
-        // If the buffer stays empty, there's nothing to display
-        if msg_buf[0] == b'\0' as c_char {
-            return true;
-        }
-
-        // Otherwise, print the error message as a c string
-        let msg = CStr::from_ptr(msg_buf.as_ptr());
-        let msg = msg.to_str().unwrap();
-        println!();
-        println!("**********************************************************************");
-        println!("*** {func}: {msg}");
-        println!("**********************************************************************");
-        println!();
-
-        // And clear the error since we're done with it
-        SDL_ClearError();
-
-        false
     }
 }
 

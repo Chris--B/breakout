@@ -32,6 +32,41 @@ mod color {
 pub const PADDLE_COLOR: Vec3 = color::WHITE;
 pub const UNBREAKABLE_BRICK_COLOR: Vec3 = color::GRAY;
 
+/// Returns true when there is not error. Think:
+/// ```rust,ignore
+/// let ok = check_sdl_error("SDL_Foo");
+/// ```
+fn check_sdl_error(func: &str) -> bool {
+    // We can't use `c_char` in literals, we HAVE to cast
+    #![allow(clippy::unnecessary_cast)]
+    use core::ffi::CStr;
+    use fermium::prelude::*;
+
+    unsafe {
+        let mut msg_buf = [0 as c_char; 512];
+        SDL_GetErrorMsg(&mut msg_buf as *mut c_char, msg_buf.len() as i32);
+
+        // If the buffer stays empty, there's nothing to display
+        if msg_buf[0] == b'\0' as c_char {
+            return true;
+        }
+
+        // Otherwise, print the error message as a c string
+        let msg = CStr::from_ptr(msg_buf.as_ptr());
+        let msg = msg.to_str().unwrap();
+        println!();
+        println!("**********************************************************************");
+        println!("*** {func}: {msg}");
+        println!("**********************************************************************");
+        println!();
+
+        // And clear the error since we're done with it
+        SDL_ClearError();
+
+        false
+    }
+}
+
 fn poll_event() -> Option<SDL_Event> {
     let mut e = SDL_Event::default();
     if unsafe { SDL_PollEvent(&mut e) == 1 } {

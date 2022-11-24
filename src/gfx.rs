@@ -404,15 +404,19 @@ impl GpuDevice {
         let pipeline_state: RenderPipelineState;
         {
             let render_pipeline_state_desc = RenderPipelineDescriptor::new();
-            render_pipeline_state_desc.set_label("Instanced Quad Pipeline");
+            render_pipeline_state_desc.set_label("Instanced Quad/Circle Pipeline");
 
             let default_lib = device.new_library_with_data(shaders::SHADERS_BIN).unwrap();
-            default_lib.set_label("Instanced Quad Lib");
+            default_lib.set_label("Instanced Quad/Circle Lib");
 
-            let func_vs = default_lib.get_function("vs_instanced_quad", None).unwrap();
+            let func_vs = default_lib
+                .get_function("vs_instanced_quad_circle", None)
+                .unwrap();
             render_pipeline_state_desc.set_vertex_function(Some(&func_vs));
 
-            let func_fs = default_lib.get_function("fs_instanced_quad", None).unwrap();
+            let func_fs = default_lib
+                .get_function("fs_instanced_quad_circle", None)
+                .unwrap();
             render_pipeline_state_desc.set_fragment_function(Some(&func_fs));
 
             let color_attachment = render_pipeline_state_desc
@@ -539,14 +543,14 @@ impl GpuDevice {
                     std::mem::size_of_val(&view) as u64,
                     MTLResourceOptions::empty(),
                 );
-                view_buffer.set_label(&format!("[{frame}] View Buffer"));
+                view_buffer.set_label(&format!("View Buffer [Frame {frame}]"));
 
                 let quads_buffer = self.device.new_buffer_with_data(
                     self.quads.as_ptr() as *const c_void,
                     (std::mem::size_of_val(&self.quads[0]) * self.quads.len()) as u64,
                     MTLResourceOptions::empty(),
                 );
-                quads_buffer.set_label(&format!("[{frame}] Quads Buffer"));
+                quads_buffer.set_label(&format!("Quads Buffer [Frame {frame}]"));
 
                 encoder.set_vertex_buffer(shaders::BUFFER_IDX_VIEW, Some(&view_buffer), 0);
                 encoder.set_vertex_buffer(shaders::BUFFER_IDX_PER_QUAD, Some(&quads_buffer), 0);

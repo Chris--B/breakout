@@ -1,7 +1,8 @@
 #include "Public.h"
 
-using namespace breakout;
 using namespace metal;
+
+using namespace breakout;
 
 // Helper to get a compile-time array's length
 template <typename T, size_t N>
@@ -23,7 +24,7 @@ struct VsInstancedQuadOut {
     float4 pos [[position]];
 };
 
-vertex VsInstancedQuadOut vs_instanced_quad(
+vertex VsInstancedQuadOut vs_instanced_quad_circle(
            uint         vid             [[vertex_id]],
     device View         const& view     [[buffer(BUFFER_IDX_VIEW)]],
     device PerQuad      const* per_quad [[buffer(BUFFER_IDX_PER_QUAD)]]
@@ -42,7 +43,7 @@ vertex VsInstancedQuadOut vs_instanced_quad(
     return out;
 }
 
-fragment float4 fs_instanced_quad(
+fragment float4 fs_instanced_quad_circle(
            uint               prim_id     [[primitive_id]],
            float2             barycentric [[barycentric_coord]],
     device PerQuad     const* per_quad    [[buffer(BUFFER_IDX_PER_QUAD)]]

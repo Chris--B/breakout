@@ -411,10 +411,10 @@ impl GpuDevice {
         let depth_state: DepthStencilState;
         {
             let render_pipeline_state_desc = RenderPipelineDescriptor::new();
-            render_pipeline_state_desc.set_label("Instanced Quad/Circle Pipeline");
+            render_pipeline_state_desc.set_name("Instanced Quad/Circle Pipeline");
 
             let default_lib = device.new_library_with_data(shaders::SHADERS_BIN).unwrap();
-            default_lib.set_label("Instanced Quad/Circle Lib");
+            default_lib.set_name("Instanced Quad/Circle Lib");
 
             let func_vs = default_lib
                 .get_function("vs_instanced_quad_circle", None)
@@ -456,7 +456,7 @@ impl GpuDevice {
             depth_texture_desc.set_storage_mode(MTLStorageMode::Memoryless);
 
             depth_texture = device.new_texture(&depth_texture_desc);
-            depth_texture.set_label(&format!("Main Depth ({width}x{height})"));
+            depth_texture.set_name(&format!("Main Depth ({width}x{height})"));
         }
 
         let cmd_queue = device.new_command_queue();
@@ -510,7 +510,7 @@ impl GpuDevice {
     fn get_next_cmd_buffer(&self, frame: usize) -> CommandBuffer {
         // TODO: Reuse cmd buffers
         let cmd_buffer = self.cmd_queue.new_command_buffer().to_owned();
-        cmd_buffer.set_label(&format!("[{frame}] Main Draw CmdBuffer"));
+        cmd_buffer.set_name(&format!("[{frame}] Main Draw CmdBuffer"));
 
         cmd_buffer
     }
@@ -536,7 +536,7 @@ impl GpuDevice {
             depth_texture_desc.set_storage_mode(MTLStorageMode::Memoryless);
 
             let depth_texture = self.device.new_texture(&depth_texture_desc);
-            depth_texture.set_label(&format!("Main Depth ({width}x{height})"));
+            depth_texture.set_name(&format!("Main Depth ({width}x{height})"));
 
             println!(
                 "Replacing \"{old}\" with \"{new}\"",
@@ -609,7 +609,7 @@ impl GpuDevice {
 
             if !self.quads.is_empty() {
                 let encoder = cmd_buffer.new_render_command_encoder(render_pass_desc);
-                encoder.set_label(&format!("[{frame}] Main Draw Encoder"));
+                encoder.set_name(&format!("[{frame}] Main Draw Encoder"));
 
                 encoder.set_render_pipeline_state(&self.pipeline_state);
                 encoder.set_depth_stencil_state(&self.depth_state);
@@ -632,14 +632,14 @@ impl GpuDevice {
                     std::mem::size_of_val(&view) as u64,
                     MTLResourceOptions::empty(),
                 );
-                view_buffer.set_label(&format!("View Buffer [Frame {frame}]"));
+                view_buffer.set_name(&format!("View Buffer [Frame {frame}]"));
 
                 let quads_buffer = self.device.new_buffer_with_data(
                     self.quads.as_ptr() as *const c_void,
                     (std::mem::size_of_val(&self.quads[0]) * self.quads.len()) as u64,
                     MTLResourceOptions::empty(),
                 );
-                quads_buffer.set_label(&format!("Quads Buffer [Frame {frame}]"));
+                quads_buffer.set_name(&format!("Quads Buffer [Frame {frame}]"));
 
                 encoder.set_vertex_buffer(shaders::BUFFER_IDX_VIEW, Some(&view_buffer), 0);
                 encoder.set_vertex_buffer(shaders::BUFFER_IDX_PER_QUAD, Some(&quads_buffer), 0);
@@ -787,3 +787,46 @@ impl GpuCapture {
         self.frames_left -= 1;
     }
 }
+
+// Prefix all of our uses of `.set_label()` with an engine-unique ID
+// This makes it easy to find our resources in traces
+trait PrefixedSetLabel {
+    fn set_name(&self, name: &str);
+}
+
+macro_rules! impl_rooibos_label {
+    // Empty list
+    () => ();
+
+    // One or more comma-delineated types, with optional trailing comma
+    ($($type_name:ty),+ $(,)?) => (
+        $(
+            impl PrefixedSetLabel for $type_name {
+                fn set_name(&self, name: &str) {
+                    // TODO: do this without heap allocating
+                    let path = module_path!();
+                    let label = format!("[{path}] {name}");
+                    self.set_label(&label);
+                }
+            }
+        )+
+    );
+}
+
+impl_rooibos_label![];
+impl_rooibos_label![
+    metal::FunctionRef,
+    metal::CommandBufferRef,
+    metal::CommandQueueRef,
+    metal::DepthStencilDescriptorRef,
+    metal::CommandEncoderRef,
+    metal::HeapRef,
+    metal::LibraryRef,
+    metal::DynamicLibraryRef,
+    metal::BinaryArchiveRef,
+    metal::ComputePipelineDescriptorRef,
+    metal::RenderPipelineDescriptorRef,
+    metal::ResourceRef,
+    metal::SamplerDescriptorRef,
+    metal::FenceRef,
+];

@@ -434,8 +434,7 @@ impl GpuDevice {
 
             render_pipeline_state_desc.set_depth_attachment_pixel_format(DEPTH_FORMAT);
             let depth_desc = DepthStencilDescriptor::new();
-            // depth_desc.set_depth_compare_function(MTLCompareFunction::LessEqual);
-            depth_desc.set_depth_compare_function(MTLCompareFunction::Always);
+            depth_desc.set_depth_compare_function(MTLCompareFunction::LessEqual);
             depth_desc.set_depth_write_enabled(true);
 
             depth_state = device.new_depth_stencil_state(&depth_desc);

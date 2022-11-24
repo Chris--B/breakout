@@ -174,6 +174,14 @@ pub fn app_main() {
                     break 'main_loop;
                 }
 
+                SDL_WINDOWEVENT => {
+                    let window_event = unsafe { e.window };
+                    if window_event.event == SDL_WINDOWEVENT_RESIZED {
+                        // gpu will query the drawable size internally, so we don't pass it anything
+                        gpu.on_view_resize();
+                    }
+                }
+
                 SDL_KEYDOWN => {
                     let key = unsafe { e.key };
 

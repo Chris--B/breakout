@@ -393,6 +393,8 @@ pub struct GpuDevice {
     quads: Vec<shaders::PerQuad>,
 }
 
+const DEPTH_FORMAT: MTLPixelFormat = MTLPixelFormat::Depth32Float;
+
 impl GpuDevice {
     pub fn new(window: &Window) -> Self {
         let window = window.clone();
@@ -403,8 +405,6 @@ impl GpuDevice {
         metal_layer.set_device(&device);
         metal_layer.set_pixel_format(MTLPixelFormat::BGRA8Unorm);
         metal_layer.set_framebuffer_only(true);
-
-        let depth_format = MTLPixelFormat::Depth32Float;
 
         // Create Pipeline & Depth State
         let pipeline_state: RenderPipelineState;
@@ -432,7 +432,7 @@ impl GpuDevice {
                 .unwrap();
             color_attachment.set_pixel_format(MTLPixelFormat::BGRA8Unorm);
 
-            render_pipeline_state_desc.set_depth_attachment_pixel_format(depth_format);
+            render_pipeline_state_desc.set_depth_attachment_pixel_format(DEPTH_FORMAT);
             let depth_desc = DepthStencilDescriptor::new();
             // depth_desc.set_depth_compare_function(MTLCompareFunction::LessEqual);
             depth_desc.set_depth_compare_function(MTLCompareFunction::Always);
@@ -445,14 +445,19 @@ impl GpuDevice {
         }
 
         // Create our depth texture
-        let size = metal_layer.drawable_size();
-        let depth_texture_desc =
-            Self::create_2d_texture_desc(depth_format, size.width as u64, size.height as u64);
-        depth_texture_desc.set_usage(MTLTextureUsage::RenderTarget);
-        depth_texture_desc.set_storage_mode(MTLStorageMode::Memoryless);
+        let depth_texture: Texture;
+        {
+            let size = metal_layer.drawable_size();
+            let (width, height) = (size.width, size.height);
 
-        let depth_texture = device.new_texture(&depth_texture_desc);
-        depth_texture.set_label("Main Depth");
+            let depth_texture_desc =
+                Self::create_2d_texture_desc(DEPTH_FORMAT, width as u64, height as u64);
+            depth_texture_desc.set_usage(MTLTextureUsage::RenderTarget);
+            depth_texture_desc.set_storage_mode(MTLStorageMode::Memoryless);
+
+            depth_texture = device.new_texture(&depth_texture_desc);
+            depth_texture.set_label(&format!("Main Depth ({width}x{height})"));
+        }
 
         let cmd_queue = device.new_command_queue();
 
@@ -512,6 +517,36 @@ impl GpuDevice {
 
     fn finish_cmd_buffer(&self, cmd_buffer: &CommandBuffer) {
         cmd_buffer.commit();
+    }
+
+    pub fn on_view_resize(&mut self) {
+        // The metal layer has been updated by the time this is called, so we can
+        // fetch the drawable size again and recreate textures
+        let size = self.metal_layer.drawable_size();
+        let (width, height) = (size.width, size.height);
+
+        // Our render target IS resized for us, so we don't need to resize anything there
+        {}
+
+        // Our depth target IS NOT resized for us, so do that now
+        {
+            let depth_texture_desc =
+                Self::create_2d_texture_desc(DEPTH_FORMAT, width as u64, height as u64);
+            depth_texture_desc.set_usage(MTLTextureUsage::RenderTarget);
+            depth_texture_desc.set_storage_mode(MTLStorageMode::Memoryless);
+
+            let depth_texture = self.device.new_texture(&depth_texture_desc);
+            depth_texture.set_label(&format!("Main Depth ({width}x{height})"));
+
+            println!(
+                "Replacing \"{old}\" with \"{new}\"",
+                old = self.depth_texture.label(),
+                new = depth_texture.label(),
+            );
+            self.depth_texture = depth_texture;
+        }
+
+        // Nothing else to resize
     }
 
     pub fn draw_circle(&mut self, pos: Vec2, radius: f32, color: Vec3) {

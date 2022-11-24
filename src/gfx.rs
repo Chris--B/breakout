@@ -42,12 +42,12 @@ mod shaders {
     #[repr(C)]
     #[derive(Copy, Clone, Debug)]
     pub struct PerQuad {
-        pub pos: Vec2,
+        pub pos: Vec3,
         pub dims: Vec2,
         pub color: Vec3,
         pub flags: u32,
     }
-    assert_eq_size!(PerQuad, [f32; 2 + 2 + 3 + 1]);
+    assert_eq_size!(PerQuad, [f32; 3 + 3 + 2 + 1]);
     assert_eq_align!(PerQuad, f32);
 
     pub const PER_QUAD_FLAGS_NONE: u32 = 0;
@@ -56,7 +56,7 @@ mod shaders {
     impl Default for PerQuad {
         fn default() -> Self {
             Self {
-                pos: Vec2::new(0., 0.),
+                pos: Vec3::new(0., 0., 0.),
                 dims: Vec2::new(1., 1.),
                 color: Vec3::new(1., 0., 1.),
                 flags: PER_QUAD_FLAGS_NONE,
@@ -466,8 +466,12 @@ impl GpuDevice {
     pub fn draw_circle(&mut self, pos: Vec2, radius: f32, color: Vec3) {
         assert_ne!(radius, 0.);
 
+        // Draw circles on top of squares
+        let pos = Vec3::new(pos.x, pos.y, 0.5);
+
         // Quad dims are side lengths, so double radius to get diameter
         let dims = 2. * Vec2::new(radius, radius);
+
         self.quads.push(shaders::PerQuad {
             pos,
             dims,
@@ -478,6 +482,9 @@ impl GpuDevice {
 
     pub fn draw_quad(&mut self, pos: Vec2, dims: Vec2, color: Vec3) {
         assert_ne!(dims, Vec2::zero());
+
+        // Draw quads with a distant depth
+        let pos = Vec3::new(pos.x, pos.y, 1.0);
 
         self.quads.push(shaders::PerQuad {
             pos,

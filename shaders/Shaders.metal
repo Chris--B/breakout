@@ -34,11 +34,11 @@ vertex VsInstancedQuadOut vs_instanced_quad(
 
     // Construct world space position
     float2 vert = quad_verts[vert_id] + float2(0.5);
-    float2 pos  = quad.pos + (quad.dims * vert);
+    float3 pos  = quad.pos + float3(quad.dims * vert, 0.);
     pos *= 0.5;
 
     VsInstancedQuadOut out;
-    out.pos = view.matViewProj * float4(pos, 0., 1.);
+    out.pos = view.matViewProj * float4(pos, 1.);
     return out;
 }
 

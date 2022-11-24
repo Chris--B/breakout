@@ -376,8 +376,12 @@ pub struct GpuDevice {
     device: Device,
     cmd_queue: CommandQueue,
 
-    // Pipeline state for {vs,fs}_instanced_quad
+    // Pipeline & Depth state for {vs,fs}_instanced_quad
     pipeline_state: RenderPipelineState,
+    depth_state: DepthStencilState,
+
+    // Textures needed per frame
+    depth_texture: Texture,
 
     metal_layer: MetalLayer,
     window: Window,
@@ -400,8 +404,11 @@ impl GpuDevice {
         metal_layer.set_pixel_format(MTLPixelFormat::BGRA8Unorm);
         metal_layer.set_framebuffer_only(true);
 
-        // Create Pipeline State
+        let depth_format = MTLPixelFormat::Depth32Float;
+
+        // Create Pipeline & Depth State
         let pipeline_state: RenderPipelineState;
+        let depth_state: DepthStencilState;
         {
             let render_pipeline_state_desc = RenderPipelineDescriptor::new();
             render_pipeline_state_desc.set_label("Instanced Quad/Circle Pipeline");
@@ -425,17 +432,37 @@ impl GpuDevice {
                 .unwrap();
             color_attachment.set_pixel_format(MTLPixelFormat::BGRA8Unorm);
 
+            render_pipeline_state_desc.set_depth_attachment_pixel_format(depth_format);
+            let depth_desc = DepthStencilDescriptor::new();
+            // depth_desc.set_depth_compare_function(MTLCompareFunction::LessEqual);
+            depth_desc.set_depth_compare_function(MTLCompareFunction::Always);
+            depth_desc.set_depth_write_enabled(true);
+
+            depth_state = device.new_depth_stencil_state(&depth_desc);
             pipeline_state = device
                 .new_render_pipeline_state(&render_pipeline_state_desc)
                 .unwrap();
         }
+
+        // Create our depth texture
+        let size = metal_layer.drawable_size();
+        let depth_texture_desc =
+            Self::create_2d_texture_desc(depth_format, size.width as u64, size.height as u64);
+        depth_texture_desc.set_usage(MTLTextureUsage::RenderTarget);
+        depth_texture_desc.set_storage_mode(MTLStorageMode::Memoryless);
+
+        let depth_texture = device.new_texture(&depth_texture_desc);
+        depth_texture.set_label("Main Depth");
 
         let cmd_queue = device.new_command_queue();
 
         Self {
             device,
             cmd_queue,
+
             pipeline_state,
+            depth_state,
+            depth_texture,
 
             metal_layer,
             window,
@@ -446,6 +473,26 @@ impl GpuDevice {
             frame: AtomicUsize::new(1),
             quads: vec![],
         }
+    }
+
+    /// Helper to create a 2D texture correctly
+    ///
+    /// Unsure why this doesn't exist in the crate, because Metal supplies it:
+    /// https://developer.apple.com/documentation/metal/mtltexturedescriptor/1515511-texture2ddescriptor
+    fn create_2d_texture_desc(
+        pixel_format: MTLPixelFormat,
+        width: u64,
+        height: u64,
+        // Skipping this until we would use it
+        // mipmapped: bool
+    ) -> TextureDescriptor {
+        let depth_texture_desc = TextureDescriptor::new();
+        depth_texture_desc.set_texture_type(MTLTextureType::D2);
+        depth_texture_desc.set_pixel_format(pixel_format);
+        depth_texture_desc.set_width(width);
+        depth_texture_desc.set_height(height);
+
+        depth_texture_desc
     }
 
     fn get_next_drawable(&self) -> MetalDrawable {
@@ -519,11 +566,18 @@ impl GpuDevice {
                 alpha: 1.,
             });
 
+            let depth_attachment = render_pass_desc.depth_attachment().unwrap();
+            depth_attachment.set_texture(Some(&self.depth_texture));
+            depth_attachment.set_load_action(MTLLoadAction::Clear);
+            depth_attachment.set_clear_depth(1.0);
+            depth_attachment.set_store_action(MTLStoreAction::DontCare);
+
             if !self.quads.is_empty() {
                 let encoder = cmd_buffer.new_render_command_encoder(render_pass_desc);
                 encoder.set_label(&format!("[{frame}] Main Draw Encoder"));
 
                 encoder.set_render_pipeline_state(&self.pipeline_state);
+                encoder.set_depth_stencil_state(&self.depth_state);
 
                 // TODO: Don't re-create buffers per-frame
                 let view = shaders::View {

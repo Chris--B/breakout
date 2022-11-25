@@ -9,9 +9,14 @@ use std::fmt;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+pub trait Waveform {
+    /// Produce the next samples and write them out to `out_samples`.
+    fn next_samples(&mut self, out_samples: &mut [u16]);
+}
+
 #[derive(Copy, Clone, Debug)]
-pub struct Sawtooth {
-    /// Sample counter
+pub struct SawtoothWaveform {
+    /// Counter
     pub t: u32,
 
     /// Samples per second
@@ -21,7 +26,7 @@ pub struct Sawtooth {
     pub wave_freq: u32,
 }
 
-impl Sawtooth {
+impl SawtoothWaveform {
     pub fn new(sample_freq: u32, wave_freq: u32) -> Self {
         Self {
             t: 0,
@@ -31,18 +36,59 @@ impl Sawtooth {
     }
 }
 
-impl Sawtooth {
-    // Produce the next samples and write them out to `out_samples`.
+impl Waveform for SawtoothWaveform {
     fn next_samples(&mut self, out_samples: &mut [u16]) {
         // The wave drops back to 0 after this many samples
-        let nsamples = self.sample_freq / self.wave_freq;
+        let wave_sample_width = self.sample_freq / self.wave_freq;
 
         // Each successive sample increases amplitude this much
-        let step = (u16::MAX as u32) / nsamples;
+        let step = (u16::MAX as u32) / wave_sample_width;
 
         for out in out_samples {
             *out = self.t as u16;
             self.t = self.t.wrapping_add(step);
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct SquareWaveform {
+    /// Counter
+    pub t: u32,
+
+    /// Samples per second
+    pub sample_freq: u32,
+
+    /// Waveforms per second
+    pub wave_freq: u32,
+
+    pub f: f32,
+}
+
+impl SquareWaveform {
+    pub fn new(sample_freq: u32, wave_freq: u32) -> Self {
+        Self {
+            t: 0,
+            sample_freq,
+            wave_freq,
+            f: 0.5,
+        }
+    }
+}
+
+impl Waveform for SquareWaveform {
+    fn next_samples(&mut self, out_samples: &mut [u16]) {
+        // The wave drops back to 0 after this many samples
+        let wave_sample_width = self.sample_freq / self.wave_freq;
+
+        for out in out_samples {
+            let t = self.t % wave_sample_width;
+            if t < (self.f * wave_sample_width as f32) as u32 {
+                *out = 0;
+            } else {
+                *out = i16::MAX as u16;
+            }
+            self.t = self.t.wrapping_add(1);
         }
     }
 }
@@ -69,12 +115,12 @@ unsafe extern "C" fn audio_callback(p_userdata: *mut c_void, p_stream: *mut u8, 
 pub struct AudioPlayer(Arc<Mutex<AudioInner>>);
 
 struct AudioInner {
-    waveform: Sawtooth,
+    waveform: SquareWaveform,
     spec: AudioSpec,
 }
 
 impl AudioPlayer {
-    pub fn new(sample_freq: u32, channels: u8, waveform: Sawtooth) -> Self {
+    pub fn new(sample_freq: u32, channels: u8, waveform: SquareWaveform) -> Self {
         assert_eq!(
             sample_freq, waveform.sample_freq,
             "Resampling is not supported yet - Waveform must use exact sample rate as Player"
@@ -126,7 +172,7 @@ impl AudioPlayer {
         }
     }
 
-    pub fn update_waveform(&self, update: impl FnOnce(&mut Sawtooth)) {
+    pub fn update_waveform(&self, update: impl FnOnce(&mut SquareWaveform)) {
         let mut inner = self.0.lock().unwrap();
         update(&mut inner.waveform);
     }

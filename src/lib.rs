@@ -104,7 +104,7 @@ fn get_keyboard_state() -> KeyboardState {
 pub fn app_main() {
     const SAMPLE_FREQ: u32 = 44_100;
 
-    let audio_player = AudioPlayer::new(SAMPLE_FREQ, 1, Sawtooth::new(SAMPLE_FREQ, 220));
+    let audio_player = AudioPlayer::new(SAMPLE_FREQ, 1, SquareWaveform::new(SAMPLE_FREQ, 220));
 
     let window_width: i32 = 500;
     let window_height: i32 = 750;
@@ -292,19 +292,10 @@ pub fn app_main() {
 
         // Advance the simulation
         if !paused {
-            // Increment the pitch of our waveform
             audio_player.update_waveform(|waveform| {
-                use core::num::Wrapping;
-
-                let w = Wrapping::<u32>(waveform.wave_freq);
-                let s = Wrapping::<u32>(waveform.sample_freq);
-
-                if s > w {
-                    let delta = (w * w) / (s - w);
-                    waveform.wave_freq = waveform.wave_freq.wrapping_add(delta.0);
-                } else {
-                    // Our waveform doesn't handle past here, so just disable it
-                    audio_player.pause();
+                waveform.f -= 0.005;
+                if waveform.f < 0. {
+                    waveform.f = 1.0;
                 }
             });
 

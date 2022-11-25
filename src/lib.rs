@@ -97,10 +97,79 @@ fn get_keyboard_state() -> KeyboardState {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+struct Sawtooth {
+    /// Sample counter
+    t: u32,
+
+    /// Samples per second
+    sample_freq: u32,
+
+    /// Full waves per second
+    wave_freq: u32,
+}
+
+impl Sawtooth {
+    fn new(sample_freq: u32, wave_freq: u32) -> Self {
+        Self {
+            t: 0,
+            sample_freq,
+            wave_freq,
+        }
+    }
+
+    // Produce the next samples and write them out to `out_samples`.
+    fn next_samples(&mut self, out_samples: &mut [u16]) {
+        // The wave drops back to 0 after this many samples
+        let nsamples = self.sample_freq / self.wave_freq;
+
+        // Each successive sample increases amplitude this much
+        let step = (u16::MAX as u32) / nsamples;
+
+        for out in out_samples {
+            *out = self.t as u16;
+            self.t = self.t.wrapping_add(step);
+        }
+    }
+}
+
+unsafe extern "C" fn audio_callback(p_userdata: *mut c_void, p_stream: *mut u8, nbytes: i32) {
+    let samples: &mut [u16] = unsafe {
+        let len: usize = nbytes as usize / core::mem::size_of::<u16>();
+        core::slice::from_raw_parts_mut(p_stream as *mut u16, len)
+    };
+
+    let waveform: &mut Sawtooth = unsafe { &mut *(p_userdata as *mut _) };
+    waveform.next_samples(samples);
+}
+
 pub fn app_main() {
+    // Initialize audio things
+    use audio::*;
+
+    // TODO: This is super race condition-y
+    let mut waveform = Sawtooth::new(44_100, 220);
+    unsafe {
+        let mut want = SDL_AudioSpec {
+            freq: waveform.sample_freq as i32,
+            format: AUDIO_U16,
+            channels: 1,
+            samples: 4_096,
+            callback: Some(audio_callback),
+            userdata: &mut waveform as *mut _ as *mut c_void,
+
+            ..core::mem::zeroed()
+        };
+        let mut have: SDL_AudioSpec = core::ptr::read(&want);
+
+        SDL_OpenAudio(&mut want, &mut have);
+        check_sdl_error("SDL_OpenAudio");
+    }
+
     let window_width: i32 = 500;
     let window_height: i32 = 750;
 
+    // Initialize graphics & UI
     let window = gfx::Window::new(window_width, window_height);
     let mut gpu = gfx::GpuDevice::new(&window);
     let mut world = World::default();
@@ -193,6 +262,10 @@ pub fn app_main() {
     let mut capture: Option<gfx::GpuCapture> = None;
 
     window.show();
+    unsafe {
+        SDL_PauseAudio(0);
+    }
+
     'main_loop: loop {
         let mut paddle_x_vel = 0.;
 
@@ -281,6 +354,24 @@ pub fn app_main() {
 
         // Advance the simulation
         if !paused {
+            // Increment the pitch of our waveform
+            {
+                use core::num::Wrapping;
+
+                let w = Wrapping::<u32>(waveform.wave_freq);
+                let s = Wrapping::<u32>(waveform.sample_freq);
+
+                if s > w {
+                    let delta = (w * w) / (s - w);
+                    waveform.wave_freq = waveform.wave_freq.wrapping_add(delta.0);
+                } else {
+                    // Our waveform doesn't handle past here, so just disable it
+                    unsafe {
+                        SDL_PauseAudio(1);
+                    }
+                }
+            }
+
             // Update movement from events - this skips the OS keyboard delay
             const PADDLE_X_VEL: f32 = 400.;
             if keyboard[SDL_SCANCODE_LEFT] != 0 {

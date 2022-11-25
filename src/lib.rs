@@ -29,8 +29,8 @@ mod color {
     pub const OHNO_PINK: Vec3 = Vec3::new(1., 0., 1.);
 }
 
-pub const PADDLE_COLOR: Vec3 = color::WHITE;
-pub const UNBREAKABLE_BRICK_COLOR: Vec3 = color::GRAY;
+const PADDLE_COLOR: Vec3 = color::WHITE;
+const UNBREAKABLE_BRICK_COLOR: Vec3 = color::GRAY;
 
 /// Returns true when there is not error. Think:
 /// ```rust,ignore

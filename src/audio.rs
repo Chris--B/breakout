@@ -93,6 +93,56 @@ impl Waveform for SquareWaveform {
     }
 }
 
+// Waveform combiner - toggles between two waveforms
+#[derive(Copy, Clone, Debug)]
+pub struct CombinedWaveforms<W1: Waveform, W2: Waveform> {
+    /// Counter
+    pub t: u32,
+
+    pub waveform1: W1,
+    pub waveform2: W2,
+
+    /// Samples per second
+    pub sample_freq: u32,
+
+    // Times per second to play BOTH waveforms
+    pub wave_freq: u32,
+
+    pub f: f32,
+}
+
+impl<W1: Waveform, W2: Waveform> CombinedWaveforms<W1, W2> {
+    pub fn new(sample_freq: u32, wave_freq: u32, waveform1: W1, waveform2: W2) -> Self {
+        Self {
+            t: 0,
+            waveform1,
+            waveform2,
+            sample_freq,
+            wave_freq,
+            f: 0.5,
+        }
+    }
+}
+
+impl<W1: Waveform, W2: Waveform> Waveform for CombinedWaveforms<W1, W2> {
+    fn next_samples(&mut self, out_samples: &mut [u16]) {
+        // The wave drops back to 0 after this many samples
+        let wave_sample_width = self.sample_freq / self.wave_freq;
+
+        for s in out_samples {
+            let sample = unsafe { core::slice::from_raw_parts_mut(s as *mut u16, 1) };
+
+            let t = self.t % wave_sample_width;
+            if t < (self.f * wave_sample_width as f32) as u32 {
+                self.waveform1.next_samples(sample);
+            } else {
+                self.waveform2.next_samples(sample);
+            }
+            self.t = self.t.wrapping_add(1);
+        }
+    }
+}
+
 unsafe extern "C" fn audio_callback(p_userdata: *mut c_void, p_stream: *mut u8, nbytes: i32) {
     use core::mem::{size_of, transmute, ManuallyDrop};
 
@@ -114,13 +164,18 @@ unsafe extern "C" fn audio_callback(p_userdata: *mut c_void, p_stream: *mut u8, 
 #[derive(Clone)]
 pub struct AudioPlayer(Arc<Mutex<AudioInner>>);
 
+// I don't want to do generics yet
+// type W = SquareWaveform;
+// type W = SawtoothWaveform;
+type W = CombinedWaveforms<SquareWaveform, SawtoothWaveform>;
+
 struct AudioInner {
-    waveform: SquareWaveform,
+    waveform: W,
     spec: AudioSpec,
 }
 
 impl AudioPlayer {
-    pub fn new(sample_freq: u32, channels: u8, waveform: SquareWaveform) -> Self {
+    pub fn new(sample_freq: u32, channels: u8, waveform: W) -> Self {
         assert_eq!(
             sample_freq, waveform.sample_freq,
             "Resampling is not supported yet - Waveform must use exact sample rate as Player"
@@ -172,7 +227,7 @@ impl AudioPlayer {
         }
     }
 
-    pub fn update_waveform(&self, update: impl FnOnce(&mut SquareWaveform)) {
+    pub fn update_waveform(&self, update: impl FnOnce(&mut W)) {
         let mut inner = self.0.lock().unwrap();
         update(&mut inner.waveform);
     }

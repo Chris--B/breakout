@@ -104,7 +104,10 @@ fn get_keyboard_state() -> KeyboardState {
 pub fn app_main() {
     const SAMPLE_FREQ: u32 = 44_100;
 
-    let audio_player = AudioPlayer::new(SAMPLE_FREQ, 1, SquareWaveform::new(SAMPLE_FREQ, 220));
+    let waveform1 = SquareWaveform::new(SAMPLE_FREQ, 220);
+    let waveform2 = SawtoothWaveform::new(SAMPLE_FREQ, 220);
+    let waveform = CombinedWaveforms::new(SAMPLE_FREQ, 1, waveform1, waveform2);
+    let audio_player = AudioPlayer::new(SAMPLE_FREQ, 1, waveform);
 
     let window_width: i32 = 500;
     let window_height: i32 = 750;
@@ -292,12 +295,12 @@ pub fn app_main() {
 
         // Advance the simulation
         if !paused {
-            audio_player.update_waveform(|waveform| {
-                waveform.f -= 0.005;
-                if waveform.f < 0. {
-                    waveform.f = 1.0;
-                }
-            });
+            // audio_player.update_waveform(|waveform| {
+            //     waveform.f -= 0.005;
+            //     if waveform.f < 0. {
+            //         waveform.f = 1.0;
+            //     }
+            // });
 
             // Update movement from events - this skips the OS keyboard delay
             const PADDLE_X_VEL: f32 = 400.;

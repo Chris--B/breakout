@@ -17,7 +17,7 @@ pub trait Waveform {
 #[derive(Copy, Clone, Debug)]
 pub struct SawtoothWaveform {
     /// Counter
-    pub t: u32,
+    pub t: i16,
 
     /// Samples per second
     pub sample_freq: u32,
@@ -42,7 +42,7 @@ impl Waveform for SawtoothWaveform {
         let wave_sample_width = self.sample_freq / self.wave_freq;
 
         // Each successive sample increases amplitude this much
-        let step = (i16::MAX as u32) / wave_sample_width;
+        let step = ((i16::MAX as u32) / wave_sample_width) as i16;
 
         for out in out_samples {
             *out = self.t as i16;
@@ -54,7 +54,7 @@ impl Waveform for SawtoothWaveform {
 #[derive(Copy, Clone, Debug)]
 pub struct SquareWaveform {
     /// Counter
-    pub t: u32,
+    pub t: i16,
 
     /// Samples per second
     pub sample_freq: u32,
@@ -79,11 +79,11 @@ impl SquareWaveform {
 impl Waveform for SquareWaveform {
     fn next_samples(&mut self, out_samples: &mut [i16]) {
         // The wave drops back to 0 after this many samples
-        let wave_sample_width = self.sample_freq / self.wave_freq;
+        let wave_sample_width = (self.sample_freq / self.wave_freq) as i16;
 
         for out in out_samples {
             let t = self.t % wave_sample_width;
-            if t < (self.f * wave_sample_width as f32) as u32 {
+            if (t as f32) < (self.f * wave_sample_width as f32) {
                 *out = 0;
             } else {
                 *out = i16::MAX as i16;
@@ -97,7 +97,7 @@ impl Waveform for SquareWaveform {
 #[derive(Copy, Clone, Debug)]
 pub struct CombinedWaveforms<W1: Waveform, W2: Waveform> {
     /// Counter
-    pub t: u32,
+    pub t: i16,
 
     pub waveform1: W1,
     pub waveform2: W2,
@@ -127,13 +127,13 @@ impl<W1: Waveform, W2: Waveform> CombinedWaveforms<W1, W2> {
 impl<W1: Waveform, W2: Waveform> Waveform for CombinedWaveforms<W1, W2> {
     fn next_samples(&mut self, out_samples: &mut [i16]) {
         // The wave drops back to 0 after this many samples
-        let wave_sample_width = self.sample_freq / self.wave_freq;
+        let wave_sample_width = (self.sample_freq / self.wave_freq) as i16;
 
         for s in out_samples {
             let sample = unsafe { core::slice::from_raw_parts_mut(s as *mut i16, 1) };
 
             let t = self.t % wave_sample_width;
-            if t < (self.f * wave_sample_width as f32) as u32 {
+            if (t as f32) < (self.f * wave_sample_width as f32) {
                 self.waveform1.next_samples(sample);
             } else {
                 self.waveform2.next_samples(sample);

@@ -107,7 +107,7 @@ pub fn app_main() {
     let waveform1 = SquareWaveform::new(SAMPLE_FREQ, 220);
     let waveform2 = SawtoothWaveform::new(SAMPLE_FREQ, 220);
     let waveform = CombinedWaveforms::new(SAMPLE_FREQ, 1, waveform1, waveform2);
-    let audio_player = AudioPlayer::new(SAMPLE_FREQ, 1, waveform);
+    let audio_player = AudioPlayer::new(SAMPLE_FREQ, 1, waveform2);
 
     let window_width: i32 = 500;
     let window_height: i32 = 750;

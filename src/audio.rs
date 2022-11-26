@@ -11,7 +11,7 @@ use std::sync::Mutex;
 
 pub trait Waveform {
     /// Produce the next samples and write them out to `out_samples`.
-    fn next_samples(&mut self, out_samples: &mut [u16]);
+    fn next_samples(&mut self, out_samples: &mut [i16]);
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -37,15 +37,15 @@ impl SawtoothWaveform {
 }
 
 impl Waveform for SawtoothWaveform {
-    fn next_samples(&mut self, out_samples: &mut [u16]) {
+    fn next_samples(&mut self, out_samples: &mut [i16]) {
         // The wave drops back to 0 after this many samples
         let wave_sample_width = self.sample_freq / self.wave_freq;
 
         // Each successive sample increases amplitude this much
-        let step = (u16::MAX as u32) / wave_sample_width;
+        let step = (i16::MAX as u32) / wave_sample_width;
 
         for out in out_samples {
-            *out = self.t as u16;
+            *out = self.t as i16;
             self.t = self.t.wrapping_add(step);
         }
     }
@@ -77,7 +77,7 @@ impl SquareWaveform {
 }
 
 impl Waveform for SquareWaveform {
-    fn next_samples(&mut self, out_samples: &mut [u16]) {
+    fn next_samples(&mut self, out_samples: &mut [i16]) {
         // The wave drops back to 0 after this many samples
         let wave_sample_width = self.sample_freq / self.wave_freq;
 
@@ -86,7 +86,7 @@ impl Waveform for SquareWaveform {
             if t < (self.f * wave_sample_width as f32) as u32 {
                 *out = 0;
             } else {
-                *out = i16::MAX as u16;
+                *out = i16::MAX as i16;
             }
             self.t = self.t.wrapping_add(1);
         }
@@ -125,12 +125,12 @@ impl<W1: Waveform, W2: Waveform> CombinedWaveforms<W1, W2> {
 }
 
 impl<W1: Waveform, W2: Waveform> Waveform for CombinedWaveforms<W1, W2> {
-    fn next_samples(&mut self, out_samples: &mut [u16]) {
+    fn next_samples(&mut self, out_samples: &mut [i16]) {
         // The wave drops back to 0 after this many samples
         let wave_sample_width = self.sample_freq / self.wave_freq;
 
         for s in out_samples {
-            let sample = unsafe { core::slice::from_raw_parts_mut(s as *mut u16, 1) };
+            let sample = unsafe { core::slice::from_raw_parts_mut(s as *mut i16, 1) };
 
             let t = self.t % wave_sample_width;
             if t < (self.f * wave_sample_width as f32) as u32 {
@@ -146,12 +146,12 @@ impl<W1: Waveform, W2: Waveform> Waveform for CombinedWaveforms<W1, W2> {
 unsafe extern "C" fn audio_callback(p_userdata: *mut c_void, p_stream: *mut u8, nbytes: i32) {
     use core::mem::{size_of, transmute, ManuallyDrop};
 
-    let out_samples: &mut [u16];
+    let out_samples: &mut [i16];
     let player: ManuallyDrop<AudioPlayer>;
     unsafe {
         // Note: We're given the buffer length in BYTES
-        let len: usize = nbytes as usize / size_of::<u16>();
-        out_samples = core::slice::from_raw_parts_mut(p_stream as *mut u16, len);
+        let len: usize = nbytes as usize / size_of::<i16>();
+        out_samples = core::slice::from_raw_parts_mut(p_stream as *mut i16, len);
 
         // Note: It's very important that we do not drop this Arc here. Doing so will drop the ref count
         // and cause the next audio_callback call to use freed memory
@@ -166,8 +166,8 @@ pub struct AudioPlayer(Arc<Mutex<AudioInner>>);
 
 // I don't want to do generics yet
 // type W = SquareWaveform;
-// type W = SawtoothWaveform;
-type W = CombinedWaveforms<SquareWaveform, SawtoothWaveform>;
+type W = SawtoothWaveform;
+// type W = CombinedWaveforms<SquareWaveform, SawtoothWaveform>;
 
 struct AudioInner {
     waveform: W,
@@ -183,7 +183,7 @@ impl AudioPlayer {
 
         let mut want = AudioSpec::new();
         want.freq = sample_freq as i32;
-        want.format = AUDIO_U16;
+        want.format = AUDIO_S16;
         want.channels = channels;
         want.samples = 4_096;
         want.callback = Some(audio_callback);
@@ -206,7 +206,7 @@ impl AudioPlayer {
             SDL_OpenAudio(&mut *want, &mut *have);
             check_sdl_error("SDL_OpenAudio");
 
-            println!("Final AudioSpec: {have:?}");
+            println!("Final AudioSpec: {have:#?}");
 
             // Save the final spec we're actually using
             inner.lock().unwrap().spec = have;
@@ -234,7 +234,7 @@ impl AudioPlayer {
 }
 
 impl AudioPlayer {
-    fn audio_callback(&self, out_samples: &mut [u16]) {
+    fn audio_callback(&self, out_samples: &mut [i16]) {
         let mut inner = self.0.lock().unwrap();
         inner.waveform.next_samples(out_samples);
     }

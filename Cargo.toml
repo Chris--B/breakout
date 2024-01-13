@@ -7,9 +7,8 @@ edition = "2021"
 
 [dependencies]
 # Metal Rendering
-metal = "0.24"
+metal = "0.27"
 objc = { version = "0.2", features = ["exception"] }
-foreign-types-shared = "0.1" # Use same version as `objc` & `metal`
 cstr = "0.2"
 
 # Window Management

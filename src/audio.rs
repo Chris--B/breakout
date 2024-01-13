@@ -6,7 +6,7 @@ use fermium::prelude::*;
 use static_assertions::*;
 
 use std::fmt;
-use std::sync::Arc;
+use std::rc::Rc;
 use std::sync::Mutex;
 
 pub trait Waveform {
@@ -45,7 +45,7 @@ impl Waveform for SawtoothWaveform {
         let step = ((i16::MAX as u32) / wave_sample_width) as i16;
 
         for out in out_samples {
-            *out = self.t as i16;
+            *out = self.t;
             self.t = self.t.wrapping_add(step);
         }
     }
@@ -86,7 +86,7 @@ impl Waveform for SquareWaveform {
             if (t as f32) < (self.f * wave_sample_width as f32) {
                 *out = 0;
             } else {
-                *out = i16::MAX as i16;
+                *out = i16::MAX;
             }
             self.t = self.t.wrapping_add(1);
         }
@@ -162,7 +162,7 @@ unsafe extern "C" fn audio_callback(p_userdata: *mut c_void, p_stream: *mut u8, 
 }
 
 #[derive(Clone)]
-pub struct AudioPlayer(Arc<Mutex<AudioInner>>);
+pub struct AudioPlayer(Rc<Mutex<AudioInner>>);
 
 // I don't want to do generics yet
 // type W = SquareWaveform;
@@ -191,7 +191,7 @@ impl AudioPlayer {
         // Allocate our inner object here
         // We do this to get a valid userdata pointer (the Arc)
         // This is modified below to get a final and valid object
-        let inner = Arc::new(Mutex::new(AudioInner {
+        let inner = Rc::new(Mutex::new(AudioInner {
             waveform,
             spec: AudioSpec::new(),
         }));
@@ -245,13 +245,13 @@ impl Drop for AudioPlayer {
         // Our audio_callback "owns" one of these ref counts.
         // We're tearing all of that down now, so reclaim it.
         unsafe {
-            // Things don't work correctly without `Arc::as_ptr`
-            Arc::decrement_strong_count(Arc::as_ptr(&self.0));
+            // Things don't work correctly without `Rc::as_ptr`
+            Rc::decrement_strong_count(Rc::as_ptr(&self.0));
         }
 
         // At this point, the object being dropped is the only expected owner
         assert_eq!(
-            Arc::strong_count(&self.0),
+            Rc::strong_count(&self.0),
             1,
             "Unexpected third+ owner of AudioPlayer's inner Arc"
         );

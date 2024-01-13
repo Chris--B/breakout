@@ -36,11 +36,18 @@ mod color {
 const PADDLE_COLOR: Vec3 = color::WHITE;
 const UNBREAKABLE_BRICK_COLOR: Vec3 = color::GRAY;
 
-/// Returns true when there is not error. Think:
-/// ```rust,ignore
-/// let ok = check_sdl_error("SDL_Foo");
+/// Returns true when everything is OK and there is no error.
+///
+/// See [`SDL_GetErrorMsg`](https://wiki.libsdl.org/SDL2/SDL_GetErrorMsg)
+/// ```rust
+/// # use breakout::check_sdl_error;
+/// if check_sdl_error("SDL_Foo") {
+///     println!("All good!");
+/// } else {
+///     eprintln!("SDL is not happy");
+/// }
 /// ```
-fn check_sdl_error(func: &str) -> bool {
+pub fn check_sdl_error(func: &str) -> bool {
     // We can't use `c_char` in literals, we HAVE to cast
     #![allow(clippy::unnecessary_cast)]
     use core::ffi::CStr;
@@ -106,7 +113,7 @@ pub fn app_main() {
 
     let waveform1 = SquareWaveform::new(SAMPLE_FREQ, 220);
     let waveform2 = SawtoothWaveform::new(SAMPLE_FREQ, 220);
-    let waveform = CombinedWaveforms::new(SAMPLE_FREQ, 1, waveform1, waveform2);
+    let _waveform = CombinedWaveforms::new(SAMPLE_FREQ, 1, waveform1, waveform2);
     let audio_player = AudioPlayer::new(SAMPLE_FREQ, 1, waveform2);
 
     let window_width: i32 = 500;

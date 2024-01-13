@@ -359,7 +359,12 @@ mod t {
                     t: 0.25,
                     pos: Vec2::new(-0.75, 0.75),
                     // Floating point rounding gets us here, so we have to type out this exactly
-                    normal: Vec2::new(-0.7071068, 0.7071068).normalized(),
+                    // normal: Vec2::new(-0.7071068, 0.7071068).normalized(),
+                    normal: Vec2::new(
+                        -std::f32::consts::FRAC_1_SQRT_2,
+                        std::f32::consts::FRAC_1_SQRT_2
+                    )
+                    .normalized(),
                 }),
             );
         }

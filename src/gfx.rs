@@ -1,16 +1,15 @@
 use fermium::prelude::*;
+use metal::foreign_types::ForeignType;
 use metal::*;
 use objc::*;
 
 use ultraviolet::projection::lh_yup::orthographic_vk as orthographic;
 use ultraviolet::{Mat4, Vec2, Vec3};
 
-use foreign_types_shared::ForeignTypeRef;
-
 use core::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_void;
-use std::sync::Arc;
+use std::rc::Rc;
 
 use crate::check_sdl_error;
 
@@ -217,7 +216,7 @@ pub fn print_device_info(device: &DeviceRef) {
 }
 
 #[derive(Clone)]
-pub struct Window(Arc<WindowImpl>);
+pub struct Window(Rc<WindowImpl>);
 
 pub struct WindowImpl {
     p_window: *mut SDL_Window,
@@ -310,7 +309,7 @@ impl Window {
             check_sdl_error("SDL_CreateRenderer");
             assert_ne!(p_renderer, std::ptr::null_mut());
 
-            Self(Arc::new(WindowImpl {
+            Self(Rc::new(WindowImpl {
                 p_window,
                 p_renderer,
             }))
@@ -327,8 +326,6 @@ impl Window {
 
 impl Window {
     fn get_metal_layer(&self) -> MetalLayer {
-        use foreign_types_shared::ForeignType;
-
         unsafe {
             let p_metal_layer = SDL_RenderGetMetalLayer(self.0.p_renderer) as *mut _;
             check_sdl_error("SDL_RenderGetMetalLayer");
@@ -659,6 +656,8 @@ pub struct GpuCapture {
 }
 
 extern "C" {
+    // It works 🤷‍♂️
+    #[allow(improper_ctypes)]
     fn GpuCapture_start(
         capture_manager: *const MTLCaptureManager,
         device: *const MTLDevice,

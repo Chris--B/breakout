@@ -1,3 +1,6 @@
+// ".flatten()" to skip over Err results is super unintuitive... so no thanks.
+#![allow(clippy::manual_flatten)]
+
 use std::env;
 use std::fs;
 use std::process::Command;
@@ -25,8 +28,6 @@ fn build_shaders() {
     println!("Building Shaders");
 
     for entry in fs::read_dir("shaders/").unwrap() {
-        // ".flatten()" to skip over Err results is super unintuitive... so no thanks.
-        #![allow(clippy::manual_flatten)]
         if let Ok(e) = entry {
             if e.file_type().unwrap().is_file() {
                 let p = e.path().canonicalize().unwrap();
@@ -93,8 +94,6 @@ fn build_swift() {
     println!("cargo:rustc-link-lib=static=RooibosPlatform");
 
     for entry in fs::read_dir("src/swift/").unwrap() {
-        // ".flatten()" to skip over Err results is super unintuitive... so no thanks.
-        #![allow(clippy::manual_flatten)]
         if let Ok(e) = entry {
             if e.file_type().unwrap().is_file() {
                 let p = e.path().canonicalize().unwrap();

@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 # Metal Rendering
-metal = "0.27"
+metal = "0.32"
 objc = { version = "0.2", features = ["exception"] }
 cstr = "0.2"
 
@@ -18,8 +18,8 @@ fermium = "22605"  # Bundles SDL 2.26.5
 embed_plist = "1.2"
 
 # Math
-ultraviolet = { version = "0.9", features = [ "bytemuck", "f64", "int"] }
-rand = "0.8"
+ultraviolet = { version = "0.10", features = [ "bytemuck", "f64", "int"] }
+rand = "0.9"
 
 # Misc
 static_assertions = "1.1"
@@ -42,5 +42,6 @@ opt-level = 3
 
 [features]
 default = []
-
 cargo_check = ["fermium/cargo_check"]
+# This is used in the objc crate
+cargo-clippy = ["cargo_check"] 

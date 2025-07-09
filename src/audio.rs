@@ -1,3 +1,5 @@
+#![allow(clippy::missing_transmute_annotations)]
+
 use crate::check_sdl_error;
 
 use fermium::prelude::*;
@@ -155,7 +157,8 @@ unsafe extern "C" fn audio_callback(p_userdata: *mut c_void, p_stream: *mut u8, 
 
         // Note: It's very important that we do not drop this Arc here. Doing so will drop the ref count
         // and cause the next audio_callback call to use freed memory
-        player = ManuallyDrop::new(transmute(p_userdata));
+        let raw_player: AudioPlayer = transmute(p_userdata);
+        player = ManuallyDrop::new(raw_player);
     };
 
     player.audio_callback(out_samples);

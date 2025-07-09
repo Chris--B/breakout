@@ -8,6 +8,7 @@ use ultraviolet::{Mat4, Vec2, Vec3};
 
 use core::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 use std::ffi::{CStr, CString};
+use std::mem::ManuallyDrop;
 use std::os::raw::c_void;
 use std::rc::Rc;
 
@@ -188,16 +189,16 @@ pub fn print_device_info(device: &DeviceRef) {
     println!();
 
     let b = check_or_x(device.supports_shader_barycentric_coordinates());
-    println!("    shader barycentric coordinates? {}", b);
+    println!("    shader barycentric coordinates? {b}");
 
     let b = check_or_x(device.supports_function_pointers());
-    println!("    function pointers?              {}", b);
+    println!("    function pointers?              {b}");
 
     let b = check_or_x(device.supports_dynamic_libraries());
-    println!("    dynamic libraries?              {}", b);
+    println!("    dynamic libraries?              {b}");
 
     let b = check_or_x(device.supports_raytracing());
-    println!("    raytracing?                     {}", b);
+    println!("    raytracing?                     {b}");
 
     println!();
 
@@ -223,13 +224,22 @@ pub struct WindowImpl {
     p_renderer: *mut SDL_Renderer,
 }
 
+impl Drop for WindowImpl {
+    fn drop(&mut self) {
+        unsafe {
+            SDL_DestroyRenderer(self.p_renderer);
+            SDL_DestroyWindow(self.p_window);
+        }
+    }
+}
+
 impl Window {
     pub fn new(width: i32, height: i32) -> Self {
         use cstr::cstr;
 
         unsafe {
             let hint_render_driver: &CStr =
-                CStr::from_ptr(std::mem::transmute(SDL_HINT_RENDER_DRIVER.as_ptr()));
+                CStr::from_ptr(SDL_HINT_RENDER_DRIVER.as_ptr() as *const c_char);
             SDL_SetHint(hint_render_driver.as_ptr(), cstr!("metal").as_ptr());
             check_sdl_error("SDL_SetHint");
 
@@ -347,7 +357,8 @@ pub struct GpuDevice {
     // Textures needed per frame
     depth_texture: Texture,
 
-    metal_layer: MetalLayer,
+    // This seg faults on macOS 15.5 24F74 on shutdown. Oops?
+    metal_layer: ManuallyDrop<MetalLayer>,
     window: Window,
 
     view_width: f32,
@@ -366,6 +377,7 @@ impl GpuDevice {
         print_device_info(&device);
 
         let metal_layer: MetalLayer = window.get_metal_layer();
+        let metal_layer = ManuallyDrop::new(metal_layer);
         metal_layer.set_device(&device);
         metal_layer.set_pixel_format(MTLPixelFormat::BGRA8Unorm);
         metal_layer.set_framebuffer_only(true);
@@ -637,16 +649,6 @@ impl GpuDevice {
     }
 }
 
-impl Drop for GpuDevice {
-    fn drop(&mut self) {
-        // TODO: Shutdown correctly
-        // unsafe {
-        //     SDL_DestroyRenderer(self.p_renderer);
-        //     SDL_DestroyWindow(self.p_window);
-        // }
-    }
-}
-
 // See: https://alia-traces.github.io/metal/tools/xcode/2020/07/18/adding-framecapture-outside-of-xcode.html
 pub struct GpuCapture {
     capture_manager: CaptureManager,
@@ -682,7 +684,7 @@ impl GpuCapture {
             tracefile.push("gputraces");
 
             if let Err(e) = std::fs::create_dir_all(&tracefile) {
-                println!("!!! Creating temp directory: {}", e);
+                println!("!!! Creating temp directory: {e}");
             }
 
             tracefile.push(format!(

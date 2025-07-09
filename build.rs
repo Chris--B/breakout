@@ -9,7 +9,7 @@ use std::str;
 fn rerun_if_changed(path: impl AsRef<std::path::Path>) {
     let path = path.as_ref().display().to_string();
 
-    println!("cargo:rerun-if-changed={}", path);
+    println!("cargo:rerun-if-changed={path}");
 
     match std::fs::File::open(&path) {
         Ok(_f) => {}
